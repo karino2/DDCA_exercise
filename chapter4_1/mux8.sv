@@ -37,7 +37,7 @@ module mux8(input logic [3:0] d0, d1, d2, d3, d4, d5, d6, d7,
     endcase
 endmodule
 
-
+/*
 module testbench_mux8();
     logic [3:0] d0, d1, d2, d3, d4, d5, d6, d7, y;
     logic [2:0] s;
@@ -62,3 +62,4 @@ module testbench_mux8();
         assert(y===4'b1101) else $error("fail 2");
     end
 endmodule
+*/
