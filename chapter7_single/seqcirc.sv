@@ -66,6 +66,12 @@ module romcode(input logic [13:0] addr,
 endmodule
 
 /*
+test for following data:
+1111ffff
+aaaacccc
+deadbeaf
+002f0123
+
 module testbench_romcode();
     logic [13:0] addr;
     logic [31:0] instr;

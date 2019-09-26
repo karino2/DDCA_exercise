@@ -70,18 +70,15 @@ module testbench_ctrlunit();
 endmodule
 */
 
-module all(
-    input logic clk,
-    input logic reset
-    );
-    logic [31:0] newPC, pc, instr;
+module mips(input logic clk, reset, input logic [31:0]instr, memReadData,
+        output logic [31:0] nextInstrAddress, memDataAddress, memWriteData,
+        output logic memWriteEnable);
+    logic [31:0] newPC, pc;
     logic RegWrite, RegDst, ALUSrc, Branch; 
     logic MemWrite, MemtoReg, Jump;
     logic [2:0] ALUCtrl;
     
-    
     flopr Pcflop(clk, reset, newPC, pc);
-    romcode InstRom(pc[13:0], instr);
     
     ctrlunit CtrlUnit(instr[31:26], instr[5:0], RegWrite, RegDst, ALUSrc, Branch, MemWrite, MemtoReg, ALUCtrl, Jump);
     
@@ -91,8 +88,6 @@ module all(
     
     assign a3 = RegDst? instr[15:11] : instr[20:16]; 
     regfile RegFile(clk, instr[25:21], instr[20:16], a3, RegWrite, regRes, rd1, rd2);
-   
-    
     
     logic [31:0] signImm, srcB, alures;
     
@@ -104,10 +99,11 @@ module all(
     
     alu Alu(rd1, srcB, ALUCtrl, cout, zero, alures);
 
-    logic [31:0] readData;    
-    sram DataMem(clk, alures, MemWrite, rd2, readData);
+    assign memDataAddress = alures;
+    assign memWriteData = rd2;
+    assign memWriteEnable = MemWrite;
     
-    mux2 ResForReg(alures, readData, MemtoReg, regRes);
+    mux2 ResForReg(alures, memReadData, MemtoReg, regRes);
  
     logic [31:0] pcPlus4, pcBranch, pcCand1, pcJump;
     
@@ -118,5 +114,24 @@ module all(
     
     assign pcCand1 = (zero & Branch) ? pcBranch : pcPlus4;
     assign newPC = Jump?pcJump : pcCand1;
+    assign nextInstrAddress = newPC;
+        
+endmodule
+
+module all(
+    input logic clk,
+    input logic reset
+    );
+
+    logic [31:0] nextInstrAddress;
+    logic [31:0] instr;
+    
+    romcode InstRom(nextInstrAddress[13:0], instr);
+    
+    logic [31:0] memReadData, memAddress, memWriteData;
+    logic memWriteEnable;        
+    sram DataMem(clk, memAddress, memWriteEnable, memWriteData, memReadData);
+    
+    mips Cpu(clk, reset, instr, memReadData, nextInstrAddress, memAddress, memWriteData, memWriteEnable);
     
 endmodule
