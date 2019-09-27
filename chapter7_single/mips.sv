@@ -70,8 +70,12 @@ module testbench_ctrlunit();
 endmodule
 */
 
-module mips(input logic clk, reset, input logic [31:0]instr, memReadData,
-        output logic [31:0] nextInstrAddress, memDataAddress, memWriteData,
+module mips(input logic clk, reset, input logic [31:0]instr, regReadData1, regReadData2, memReadData,
+            output logic [31:0] nextInstrAddress, 
+            output logic [4:0] regAddr1, regAddr2, regWriteAddr,
+            output logic [31:0] regWriteData,
+            output logic regWriteEnable,
+            output logic [31:0] memDataAddress, memWriteData,
         output logic memWriteEnable);
     logic [31:0] newPC, pc;
     logic RegWrite, RegDst, ALUSrc, Branch; 
@@ -81,13 +85,11 @@ module mips(input logic clk, reset, input logic [31:0]instr, memReadData,
     flopr Pcflop(clk, reset, newPC, pc);
     
     ctrlunit CtrlUnit(instr[31:26], instr[5:0], RegWrite, RegDst, ALUSrc, Branch, MemWrite, MemtoReg, ALUCtrl, Jump);
-    
-    logic [4:0] a3;
-    logic [31:0] rd1, rd2;
-    logic [31:0] regRes;    
-    
-    assign a3 = RegDst? instr[15:11] : instr[20:16]; 
-    regfile RegFile(clk, instr[25:21], instr[20:16], a3, RegWrite, regRes, rd1, rd2);
+        
+    assign regWriteAddr = RegDst? instr[15:11] : instr[20:16]; 
+    assign regAddr1 = instr[25:21];
+    assign regAddr2 = instr[20:16];
+    assign regWriteEnable = RegWrite;    
     
     logic [31:0] signImm, srcB, alures;
     
@@ -95,15 +97,15 @@ module mips(input logic clk, reset, input logic [31:0]instr, memReadData,
     
     logic cout, zero;
     
-    mux2 MuxSrcB(rd2, signImm, ALUSrc, srcB); 
+    mux2 MuxSrcB(regReadData2, signImm, ALUSrc, srcB); 
     
-    alu Alu(rd1, srcB, ALUCtrl, cout, zero, alures);
+    alu Alu(regReadData1, srcB, ALUCtrl, cout, zero, alures);
 
     assign memDataAddress = alures;
-    assign memWriteData = rd2;
+    assign memWriteData = regReadData2;
     assign memWriteEnable = MemWrite;
     
-    mux2 ResForReg(alures, memReadData, MemtoReg, regRes);
+    mux2 ResForReg(alures, memReadData, MemtoReg, regWriteData);
  
     logic [31:0] pcPlus4, pcBranch, pcCand1, pcJump;
     
@@ -132,6 +134,13 @@ module all(
     logic memWriteEnable;        
     sram DataMem(clk, memAddress, memWriteEnable, memWriteData, memReadData);
     
-    mips Cpu(clk, reset, instr, memReadData, nextInstrAddress, memAddress, memWriteData, memWriteEnable);
+    
+    logic [4:0] regAddr1, regAddr2, regWriteAddr;
+    logic regWriteEnable;
+    logic [31:0] regReadData1, regReadData2, regWriteData;
+    
+    regfile RegFile(clk, regAddr1, regAddr2, regWriteAddr, regWriteEnable, regWriteData, regReadData1, regReadData2);
+
+    mips Cpu(clk, reset, instr, regReadData1, regReadData2, memReadData, nextInstrAddress, regAddr1, regAddr2, regWriteAddr, regWriteData, regWriteEnable,  memAddress, memWriteData, memWriteEnable);
     
 endmodule
