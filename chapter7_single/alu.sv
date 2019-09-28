@@ -76,8 +76,8 @@ module alu(
 
     mux2 bmux(b, ~b, f[2], bb);
     adder aluadder(a, bb, f[2], s, cout);
-    mux4 lastmux(a&bb, a|bb, s, {{31{0}}, s[31]}, f[1:0], y);
-    asign zero = (y == 0);
+    mux4 lastmux(a&bb, a|bb, s, {31'b0, s[31]}, f[1:0], y);
+    assign zero = (y == 0);
 endmodule
 
 /*

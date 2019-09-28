@@ -54,12 +54,12 @@ endmodule
 /*
 we design ROM as 64K byte, 16K word. address needs 14bit.
 */
-module romcode(input logic [13:0] addr,
+module romcode #(parameter FILENAME="romdata.mem")(input logic [13:0] addr,
             output logic [31:0] instr);
     logic [31:0] ROM [16*1024-1:0];
     
     initial begin
-        $readmemh("romdata.mem", ROM);
+        $readmemh(FILENAME, ROM);
     end
     
     assign instr = ROM[addr];
@@ -98,9 +98,12 @@ module regfile(
 
     always_ff @(posedge clk)
         if(we3) regs[a3] <= wd3;
+
+    always @(posedge clk)
+        $display("1=%h, 2=%h, 3=%h, 4=%h, 5=%h, 6=%h, 7=%h, 8=%h", regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7], regs[8]);
         
-    assign rd1 = regs[a1];
-    assign rd2 = regs[a2];    
+    assign rd1 = (a1 == 0)? 0 : regs[a1];
+    assign rd2 = (a2 == 0)?  0 : regs[a2];    
  endmodule
  
  /*

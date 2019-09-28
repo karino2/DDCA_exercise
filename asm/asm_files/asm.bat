@@ -1,0 +1,1 @@
+..\MipsAsm\bin\Debug\netcoreapp3.0\MipsAsm.exe %1

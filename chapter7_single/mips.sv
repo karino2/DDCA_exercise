@@ -29,60 +29,41 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
     assign Branch = Opcode == 6'b000100;
     assign MemWrite = Opcode == 6'b101011;
     assign MemtoReg = Opcode == 6'b100011;
-    assign ALUCtrl = ((Opcode == 6'b000100) | ((Opcode == 0) & (Funct == 6'd34))) ? 3'b110 : 3'b010;
+    always_comb
+        if(Opcode == 6'b000100)
+            ALUCtrl = 3'b110;
+        else
+            case(Funct)
+                6'd34: ALUCtrl = 3'b110;
+                 6'b100100: ALUCtrl = 3'b000;
+                 6'b100101: ALUCtrl = 3'b001;
+                 6'b101010: ALUCtrl = 3'b111;
+                 default: ALUCtrl = 3'b010;
+            endcase
+    /*                     
+    assign ALUCtrl = ((Opcode == 6'b000100) | ((Opcode == 0) & (Funct == 6'd34))) ? 3'b110 : 
+             (Funct == 6'b100100 ? 3'b000 : (Funct == 6'b100101 ? 3'b001 : (Funct == 6'b101010 ? 3'b111 :   3'b010)));
+             */
     assign Jump = Opcode == 6'b000010;     
 endmodule
 
-/*
-module testbench_ctrlunit();
-    logic [5:0] Opcode, Funct;
-    logic RegWrite, RegDst, ALUSrc, Branch; 
-    logic MemWrite, MemtoReg, Jump;
-    logic [2:0] ALUCtrl;
-    
-    ctrlunit dut(Opcode, Funct, RegWrite, RegDst, ALUSrc, Branch, MemWrite, MemtoReg, ALUCtrl, Jump);
-    
-    initial begin
-        // add
-        Opcode = 0; Funct = 6'd32; #10;
-        assert(RegWrite & RegDst & ~ALUSrc & ~Branch & ~MemWrite & ~MemtoReg & (ALUCtrl == 3'b010) & ~Jump) else $error("fail add");
-        // sub
-        Funct = 6'd34; #10;
-        assert(RegWrite & RegDst & ~ALUSrc & ~Branch & ~MemWrite & ~MemtoReg & (ALUCtrl == 3'b110) & ~Jump) else $error("fail sub");
-        
-        // beq
-        Opcode = 6'b000100; Funct = 0; #10;
-        assert(~RegWrite & ~ALUSrc & Branch & ~MemWrite & (ALUCtrl == 3'b110) & ~Jump) else $error("fail beq");
-
-        // j
-        Opcode = 6'b000010; #10;
-        assert(~RegWrite & ~MemWrite & Jump) else $error("fail j");
-        
-        // lw
-        Opcode = 6'b100011; #10;
-        assert(RegWrite & ~RegDst & ALUSrc & ~Branch & ~MemWrite & MemtoReg & (ALUCtrl == 3'b010) & ~Jump) else $error("fail lw");
-        
-                
-        
-        
-    end
-
-endmodule
-*/
 
 module mips(input logic clk, reset, input logic [31:0]instr, regReadData1, regReadData2, memReadData,
-            output logic [31:0] nextInstrAddress, 
+            output logic [31:0] pc, 
             output logic [4:0] regAddr1, regAddr2, regWriteAddr,
             output logic [31:0] regWriteData,
             output logic regWriteEnable,
             output logic [31:0] memDataAddress, memWriteData,
         output logic memWriteEnable);
-    logic [31:0] newPC, pc;
+    logic [31:0] newPC;
     logic RegWrite, RegDst, ALUSrc, Branch; 
     logic MemWrite, MemtoReg, Jump;
     logic [2:0] ALUCtrl;
     
     flopr Pcflop(clk, reset, newPC, pc);
+    always @(clk, reset)
+        $display("pc=%h", pc);
+
     
     ctrlunit CtrlUnit(instr[31:26], instr[5:0], RegWrite, RegDst, ALUSrc, Branch, MemWrite, MemtoReg, ALUCtrl, Jump);
         
@@ -110,13 +91,12 @@ module mips(input logic clk, reset, input logic [31:0]instr, regReadData1, regRe
     logic [31:0] pcPlus4, pcBranch, pcCand1, pcJump;
     
     assign pcPlus4 = pc+4;
-    assign pcBranch = {signImm[29:0], 4'b0000}+pcPlus4;
+    assign pcBranch = {signImm[29:0], 2'b00}+pcPlus4;
     assign pcJump = {pcPlus4[31:28], instr[25:0], 2'b00};
     
     
     assign pcCand1 = (zero & Branch) ? pcBranch : pcPlus4;
     assign newPC = Jump?pcJump : pcCand1;
-    assign nextInstrAddress = newPC;
         
 endmodule
 
@@ -125,10 +105,10 @@ module all(
     input logic reset
     );
 
-    logic [31:0] nextInstrAddress;
+    logic [31:0] pc;
     logic [31:0] instr;
     
-    romcode InstRom(nextInstrAddress[13:0], instr);
+    romcode InstRom(pc[13:0], instr);
     
     logic [31:0] memReadData, memAddress, memWriteData;
     logic memWriteEnable;        
