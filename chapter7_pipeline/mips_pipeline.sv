@@ -94,31 +94,35 @@ endmodule
 module decode2exec(input logic clk, reset,
             input logic [31:0] regData1D, regData2D,  
                     immExtendD, pcPlus4D,
-            input logic [4:0] regWriteAddrD,
+            input logic [4:0] regWriteAddrD, regRsD, regRtD,
             input logic [7:0]  ctrlD,
             output logic [31:0] regData1E, regData2E, 
                     immExtendE, pcPlus4E,
-            output logic [4:0] regWriteAddrE,
+            output logic [4:0] regWriteAddrE, regRsE, regRtE,
             output logic [7:0] ctrlE);
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
                 pcPlus4E <= 32'h0040_0000; // PC reset address. Not used.
                 regData1E <= 0;
                 regData2E <= 0;
-                regWriteAddrE <= 0; 
                 immExtendE <= 0;
                 pcPlus4E <= 0;
-                ctrlE = 0; // ctrl should mean nop if everything is false.
+                regWriteAddrE <= 0; 
+                regRsE <= 0;
+                regRtE <= 0;
+                ctrlE <= 0; // ctrl should mean nop if everything is false.
             end
         else
             begin
                 pcPlus4E <= pcPlus4D;
                 regData1E <= regData1D;
                 regData2E <= regData2D;
-                regWriteAddrE <= regWriteAddrD; 
                 immExtendE <= immExtendD;
                 pcPlus4E <= pcPlus4D;
-                ctrlE = ctrlD;
+                regWriteAddrE <= regWriteAddrD; 
+                regRsE <= regRsD;
+                regRtE <= regRtD;
+                ctrlE <= ctrlD;
             end 
 endmodule
 
@@ -126,24 +130,38 @@ endmodule
 module exec_stage(input logic clk, reset, ALUSrc,
                 input logic [2:0] ALUCtrl,
                 input logic [31:0] regData1, regData2, immExtend, pcPlus4,
+                aluResM, aluResW,
+                input logic [1:0] ForwardAE, ForwardBE,
                 output logic zero,
-                output logic [31:0] aluRes, pcBranch);
+                output logic [31:0] aluRes, pcBranch, memWriteData);
     // logic [31:0] signImm, srcB, alures;
     logic [31:0] srcB;
-    mux2 MuxSrcB(regData2, immExtend, ALUSrc, srcB); 
+    logic [31:0] regData1H, regData2H;
+    
+    assign regData1H = (ForwardAE == 2'b10) ? aluResM : ((ForwardAE == 2'b01) ? aluResW : regData1);
+    assign regData2H = (ForwardBE == 2'b10) ? aluResM : ((ForwardAE == 2'b01) ? aluResW : regData2);
+    assign memWriteData = regData2H;
+    always @(posedge clk)
+        begin
+            $display("regData1H=%h, regData2H=%h, regData1=%h, regData2=%h, immExtend=%h",
+                        regData1H, regData2H, regData1, regData2, immExtend);
+        end
+    
+    
+    mux2 MuxSrcB(regData2H, immExtend, ALUSrc, srcB); 
     
     logic cout;
-    alu Alu(regData1, srcB, ALUCtrl, cout, zero, aluRes);
+    alu Alu(regData1H, srcB, ALUCtrl, cout, zero, aluRes);
 
     assign pcBranch = {immExtend[29:0], 2'b00}+pcPlus4;
 endmodule
 
 module exec2mem(input logic clk, reset, zeroE,
-            input logic [31:0] aluResE, regData2E, pcBranchE,
+            input logic [31:0] aluResE, memWriteDataE, pcBranchE,
             input logic [4:0] regWriteAddrE, 
             input logic [3:0]  ctrlE,
             output logic zeroM,
-            output logic [31:0] aluResM, regData2M, pcBranchM,
+            output logic [31:0] aluResM, memWriteDataM, pcBranchM,
             output logic [4:0]  regWriteAddrM,
             output logic [3:0]  ctrlM);
     always_ff @(posedge clk, posedge reset)
@@ -151,7 +169,7 @@ module exec2mem(input logic clk, reset, zeroE,
                 zeroM <= 0;
                 aluResM <= 0;
                 regWriteAddrM <= 0;
-                regData2M <= 0;
+                memWriteDataM <= 0;
                 pcBranchM <= 0;
                 ctrlM <= 0;
             end
@@ -160,7 +178,7 @@ module exec2mem(input logic clk, reset, zeroE,
                 zeroM <= zeroE;
                 aluResM <= aluResE;
                 regWriteAddrM <= regWriteAddrE;
-                regData2M <= regData2E;
+                memWriteDataM <= memWriteDataE;
                 pcBranchM <= pcBranchE;
                 ctrlM <= ctrlE;
             end 
@@ -206,6 +224,16 @@ module writeback_stage(input logic clk, reset,
     mux2 ResForReg(aluRes, memReadData, MemtoReg, regWriteData);
 endmodule
 
+module hazard(input logic [4:0] regRsE, regRtE,
+              input logic [4:0] regWriteAddrM, input logic RegWriteEnableM,
+              input logic [4:0] regWriteAddrW, input logic RegWriteEnableW,
+              output logic [1:0] ForwardAE, ForwardBE);
+      assign ForwardAE = ((regRsE != 0) & RegWriteEnableM & (regRsE == regWriteAddrM))? 2'b10 :
+                            (((regRsE != 0)& RegWriteEnableW & (regRsE == regWriteAddrW))? 2'b01 : 2'b00); 
+      assign ForwardBE = ((regRtE != 0) & RegWriteEnableM & (regRtE == regWriteAddrM))? 2'b10 :
+                            (((regRtE != 0)& RegWriteEnableW & (regRtE == regWriteAddrW))? 2'b01 : 2'b00); 
+endmodule
+                
 
 module mips_pipeline #(parameter FILENAME="mipstest.mem") (
    input logic clk,
@@ -224,15 +252,19 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
                 regData1D, regData2D, immExtendD,
                 regData1E, regData2E, immExtendE, pcPlus4E;
 
+    logic [31:0] memWriteDataE, memWriteDataM;
     logic [31:0] aluResE, aluResM;
     logic [31:0] pcBranchE;
     logic zeroE;
     logic zeroM;
-    logic [31:0] regData2M, pcBranchM, memReadDataM;
+    logic [31:0] pcBranchM, memReadDataM;
     logic [31:0] aluResW, memReadDataW, regWriteDataW;
 
 
-
+    hazard Hazard(regRsE, regRtE,
+              regWriteAddrM, RegWriteEnableM,
+              regWriteAddrW, RegWriteEnableW,
+              ForwardAE, ForwardBE);
     fetch_stage #(FILENAME) FetchStage(clk, reset, BranchM, pcBranchM, pcPlus4F, instrF);
     fetch2decode Fetch2Decode(clk, reset, instrF, pcPlus4F, instrD, pcPlus4D);
 
@@ -246,27 +278,36 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
                          MemtoRegD, ALUCtrlD, JumpD);    
             $display("regWriteAddrD=%h, regWriteAddrE=%h, regWriteAddrM=%h", 
                         regWriteAddrD, regWriteAddrE, regWriteAddrM);
+            $display("regData1D=%h, regData2D=%h, regData1E=%h, regData2E", 
+                        regData1D, regData2D, regData1E, regData2E);
             $display("aluResE=%h, aluResM=%h, aluResW=%h", 
                         aluResE, aluResM, aluResW);
+            $display("ForwardAE=%b, ForwardBE=%b", 
+                        ForwardAE, ForwardBE);
             $display("regWriteAddrW=%h, regWriteDataW=%h, RegWriteEnableW=%h", 
                         regWriteAddrW, regWriteDataW, RegWriteEnableW);
         end
-                     
+
+    logic [1:0] ForwardAE, ForwardBE;
+    logic [4:0] regRsE, regRtE;                     
 
     decode_stage DecodeStage(clk, reset, RegWriteEnableW, RegDstD, instrD, regWriteAddrW, regWriteDataW,
                              regData1D, regData2D, immExtendD, regWriteAddrD);
-    decode2exec Decode2Exec(clk, reset, regData1D, regData2D, immExtendD, pcPlus4D, regWriteAddrD, 
+    decode2exec Decode2Exec(clk, reset, regData1D, regData2D, immExtendD, pcPlus4D, regWriteAddrD,
+                             instrD[25:21], instrD[20:16],
                             {ALUCtrlD, ALUSrcD, MemWriteEnableD, BranchD, RegWriteEnableD, MemtoRegD},
                              regData1E, regData2E, immExtendE, pcPlus4E, regWriteAddrE,
+                              regRsE, regRtE,
                             {ALUCtrlE, ALUSrcE, MemWriteEnableE, BranchE, RegWriteEnableE, MemtoRegE});
-    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, regData1E, regData2E, immExtendE, pcPlus4E, zeroE,
-                         aluResE, pcBranchE);
-    exec2mem Exec2Mem(clk, reset, zeroE, aluResE, regData2E, pcBranchE, regWriteAddrE, 
+    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, regData1E, regData2E, immExtendE, pcPlus4E,
+                        aluResM, aluResW, ForwardAE, ForwardBE,
+                         zeroE, aluResE, pcBranchE, memWriteDataE);
+    exec2mem Exec2Mem(clk, reset, zeroE, aluResE, memWriteDataE, pcBranchE, regWriteAddrE, 
                         {MemWriteEnableE, BranchE, RegWriteEnableE, MemtoRegE},
-                        zeroM, aluResM,  regData2M, pcBranchM, regWriteAddrM,
+                        zeroM, aluResM,  memWriteDataM, pcBranchM, regWriteAddrM,
                         {MemWriteEnableM, BranchM, RegWriteEnableM, MemtoRegM});
     mem_stage MemStage(clk, reset, MemWriteEnableM,
-                        aluResM, regData2M,  memReadDataM);
+                        aluResM, memWriteDataM,  memReadDataM);
     mem2writeback Mem2WriteBack(clk, reset, aluResM, memReadDataM, regWriteAddrM,
                         {RegWriteEnableM, MemtoRegM},
                         aluResW, memReadDataW, regWriteAddrW,

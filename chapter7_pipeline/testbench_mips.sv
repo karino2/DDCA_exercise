@@ -69,7 +69,7 @@ module testbench_mipstest_add(
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
-        // reg 3 RAW hazard. not yet pass.
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         assert(dut.DecodeStage.RegFile.regs[3] == 32'd8) else $error("fail reg3 add, %b", dut.DecodeStage.RegFile.regs[3]);
         $display("mips add test done");
     end
