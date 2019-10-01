@@ -23,12 +23,13 @@
 module flopr(
     input logic clk,
     input logic reset,
+    input logic en,
     input logic [31:0] a,
     output logic [31:0] y
     );
     always_ff @(posedge clk, posedge reset)
         if(reset) y <= 32'h0040_0000; // PC reset address.
-        else y <= a;        
+        else if(en) y <= a;        
 endmodule
 
 /*

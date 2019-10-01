@@ -55,16 +55,11 @@ module testbench_mipstest_add(
     );
     logic clk, reset;
 
-    logic [31:0] pc;
-    logic [31:0] instr;
-    
     mips_pipeline #("mipstest_add.mem") dut(clk, reset);
     
     initial begin
         clk = 0; reset = 1; #10;
-        // $display("next instr address=%h, nextInstr=%h", pc, instr);
         reset = 0; clk = 1; #10;
-        // $display("next instr address=%h, nextInstr=%h", pc, instr);
         clk = 0; #10;
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
@@ -72,6 +67,31 @@ module testbench_mipstest_add(
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         assert(dut.DecodeStage.RegFile.regs[3] == 32'd8) else $error("fail reg3 add, %b", dut.DecodeStage.RegFile.regs[3]);
         $display("mips add test done");
+    end
+    
+endmodule
+
+
+module testbench_mipstest_lwsw(
+    );
+    logic clk, reset;
+
+    mips_pipeline #("mipstest_lwsw.mem") dut(clk, reset);
+    
+    initial begin
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+        clk = 0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        assert(dut.DecodeStage.RegFile.regs[5] == 32'd8) else $error("fail reg5 lwsw, %b", dut.DecodeStage.RegFile.regs[5]);
+        $display("mips lwsw test done");
     end
     
 endmodule
