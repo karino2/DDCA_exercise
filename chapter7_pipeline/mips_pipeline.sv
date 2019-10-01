@@ -47,8 +47,9 @@ endmodule
 module romcode #(parameter FILENAME="romdata.mem")(input logic [13:0] addr,
 */
 module fetch_stage #(parameter FILENAME="romdata.mem")
-            (input logic clk, reset, Stall, pcSrc,
-                input logic [31:0] pcBranch,
+            (input logic clk, reset, Stall,
+             input logic [1:0] pcSrc,
+                input logic [31:0] pcBranch, pcJump,
                 output logic [31:0] pcPlus4, instr);
     logic [31:0] pc, newPC;
 
@@ -59,7 +60,7 @@ module fetch_stage #(parameter FILENAME="romdata.mem")
     always @(posedge clk)
         $display("instr %h", instr);    
 
-    assign newPC = pcSrc? pcBranch: pcPlus4;
+    assign newPC = (pcSrc == 2'b01) ? pcBranch:  ((pcSrc == 2'b10) ? pcJump : pcPlus4);
 
 endmodule
 
@@ -86,8 +87,8 @@ module decode_stage(input logic clk, reset, regWriteEnable,
             input logic ForwardAD, ForwardBD,
             output logic [31:0] regReadData1, regReadData2, immExtend,
             output logic [4:0] outRegWriteAddr,
-            output logic pcSrcD,
-            output logic [31:0] pcBranch);
+            output logic isBranch,
+            output logic [31:0] pcBranch, pcJump);
 
     logic [31:0] eqLeft, eqRight;
 
@@ -98,8 +99,9 @@ module decode_stage(input logic clk, reset, regWriteEnable,
     assign eqLeft = ForwardAD ? aluResM : regReadData1;
     assign eqRight = ForwardBD ? aluResM : regReadData2;
     
-    assign pcSrcD = BranchD & (eqLeft == eqRight);
-    assign pcBranch = {immExtend[29:0], 2'b00}+pcPlus4;    
+    assign isBranch = BranchD & (eqLeft == eqRight);
+    assign pcBranch = {immExtend[29:0], 2'b00}+pcPlus4;
+    assign pcJump = {pcPlus4[31:28], instr[25:0], 2'b00};
 endmodule
 
 
@@ -150,7 +152,7 @@ module exec_stage(input logic clk, reset, ALUSrc,
     assign memWriteData = regData2H;
     always @(posedge clk)
         begin
-            $display("regData1H=%h, regData2H=%h, regData1=%h, regData2=%h, immExtend=%h",
+            $display("exec: regData1H=%h, regData2H=%h, regData1=%h, regData2=%h, immExtend=%h",
                         regData1H, regData2H, regData1, regData2, immExtend);
         end
     
@@ -229,7 +231,7 @@ module writeback_stage(input logic clk, reset,
 endmodule
 
 module hazard(input logic [4:0] regRsD, regRtD, regRsE, regRtE,
-              input logic ALUSrcD, BranchD,
+              input logic ALUSrcD, BranchD, JumpD,
               input logic [4:0] regWriteAddrE, input logic RegWriteEnableE, input logic MemtoRegE,
               input logic [4:0] regWriteAddrM, input logic RegWriteEnableM, input logic MemtoRegM,
               input logic [4:0] regWriteAddrW, input logic RegWriteEnableW,
@@ -257,7 +259,7 @@ module hazard(input logic [4:0] regRsD, regRtD, regRsE, regRtE,
     
     assign StallF = lwstall | branchstall;
     assign StallD = lwstall | branchstall;
-    assign FlushE = lwstall | branchstall;
+    assign FlushE = lwstall | branchstall | JumpD;
 endmodule
                 
 
@@ -289,8 +291,9 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     
     logic [1:0] ForwardAE, ForwardBE;
     logic [4:0] regRsE, regRtE;
-    logic pcSrcD, ForwardAD, ForwardBD;
-    logic [31:0] pcBranchD;                     
+    logic [1:0] pcSrcD;
+    logic ForwardAD, ForwardBD;
+    logic [31:0] pcBranchD, pcJumpD;                     
     
     always @(posedge clk)
         begin
@@ -299,6 +302,9 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
                          MemtoRegD, ALUCtrlD, JumpD);    
             $display("regWAddrD=%h, regWAddrE=%h, regWAddrM=%h, memRDataM=%h, memRDataW=%h", 
                         regWriteAddrD, regWriteAddrE, regWriteAddrM, memReadDataM, memReadDataW);
+            $display("regData1D=%h, regData2D=%h, regData1E=%h, regData2E=%h,", 
+                        regData1D, regData2D, regData1E, regData2E);
+            $display("regAddr1D=%d, regAddr2D=%d", instrD[25:21], instrD[20:16]);
             $display("regWAddrW=%h, regWDataW=%h, RegWriteEnableW=%h", 
                         regWriteAddrW, regWriteDataW, RegWriteEnableW);
             $display("memWDataE=%h, memWDataM=%h, memWEnableM=%b", 
@@ -312,22 +318,23 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
         end
 
     hazard Hazard(instrD[25:21], instrD[20:16], regRsE, regRtE,
-                ALUSrcD, BranchD,
+                ALUSrcD, BranchD, JumpD,
               regWriteAddrE, RegWriteEnableE, MemtoRegE,
               regWriteAddrM, RegWriteEnableM, MemtoRegM,
               regWriteAddrW, RegWriteEnableW,
               ForwardAE, ForwardBE,
               ForwardAD, ForwardBD,
               StallF, StallD, FlushE);
-    fetch_stage #(FILENAME) FetchStage(clk, reset, StallF, pcSrcD, pcBranchD, pcPlus4F, instrF);
-    fetch2decode Fetch2Decode(clk, reset, StallD, pcSrcD, instrF, pcPlus4F, instrD, pcPlus4D);
+    fetch_stage #(FILENAME) FetchStage(clk, reset, StallF, pcSrcD, pcBranchD, pcJumpD, pcPlus4F, instrF);
+    fetch2decode Fetch2Decode(clk, reset, StallD, pcSrcD[0] | pcSrcD[1], instrF, pcPlus4F, instrD, pcPlus4D);
 
     ctrlunit CtrlUnit(instrD[31:26], instrD[5:0], RegWriteEnableD, RegDstD, ALUSrcD, BranchD, MemWriteEnableD,
                      MemtoRegD, ALUCtrlD, JumpD);
                      
     decode_stage DecodeStage(clk, reset, RegWriteEnableW, RegDstD, BranchD, instrD, regWriteAddrW, regWriteDataW,
                           pcPlus4D, aluResM, ForwardAD, ForwardBD,
-                             regData1D , regData2D, immExtendD, regWriteAddrD, pcSrcD, pcBranchD);
+                             regData1D , regData2D, immExtendD, regWriteAddrD, pcSrcD[0], pcBranchD, pcJumpD);
+    assign pcSrcD[1] = JumpD;
     decode2exec Decode2Exec(clk, reset, FlushE, regData1D, regData2D, immExtendD, regWriteAddrD,
                              instrD[25:21], instrD[20:16],
                             {ALUCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD},

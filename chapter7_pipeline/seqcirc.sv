@@ -97,9 +97,13 @@ module regfile(
 
     logic [31:0] regs [31:0];
 
-    always_ff @(posedge clk)
-        if(we3) regs[a3] <= wd3;
+    always_ff @(negedge clk)
+        if(we3) begin
+            regs[a3] <= wd3;
+            $display("reg write: a3=%h, wd3=%h", a3, wd3);
+        end
 
+    // always @(posedge clk)
     always @(posedge clk)
         $display("1=%h, 2=%h, 3=%h, 4=%h, 5=%h, 6=%h, 7=%h, 8=%h", regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7], regs[8]);
         

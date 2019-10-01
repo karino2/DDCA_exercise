@@ -66,6 +66,7 @@ module testbench_mipstest_add(
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         assert(dut.DecodeStage.RegFile.regs[3] == 32'd8) else $error("fail reg3 add, %b", dut.DecodeStage.RegFile.regs[3]);
+        assert(dut.DecodeStage.RegFile.regs[4] == 32'd11) else $error("fail reg4 add, %b", dut.DecodeStage.RegFile.regs[4]);
         $display("mips add test done");
     end
     
@@ -119,18 +120,37 @@ module testbench_mipstest_beq(
     
 endmodule
 
-/*
+module testbench_mipstest_orand(
+    );
+    logic clk, reset;
+
+    mips_pipeline #("mipstest_orand.mem") dut(clk, reset);
+                         
+    initial begin
+        clk = 0; reset = 1; #10;
+        reset = 0; #10;
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
+        $display("mips orand test begin");
+        assert(dut.DecodeStage.RegFile.regs[7] === 3) else $error("addi hazard of $7 fail, %h", dut.DecodeStage.RegFile.regs[7]);
+        assert(dut.DecodeStage.RegFile.regs[4] === 7) else $error("or hazard fail, %h", dut.DecodeStage.RegFile.regs[4]);
+        assert(dut.DecodeStage.RegFile.regs[5] === 4) else $error("and hazard fail. %h", dut.DecodeStage.RegFile.regs[5]);
+        $display("mips orand test end");
+    end
+    
+endmodule
+
+
+
 // Test bench writen in text book 7.6.3.
 module testbench_mipstest_books(
     );
     logic clk, reset;
 
-    logic [31:0] pc;
-    logic [31:0] instr;
-    
-    romcode #("mipstest.mem") InstRom(pc[15:2], instr);
-        
-    all_without_rom dut(clk, reset, instr, pc);
+    mips_pipeline #("mipstest.mem") dut(clk, reset);
                      
     initial begin
         clk = 0; reset = 1; #10;
@@ -144,10 +164,9 @@ module testbench_mipstest_books(
         
     always @(negedge clk)
         begin
-            if(dut.DataMem.SRAM[84] === 7) begin
+            if(dut.MemStage.DataMem.SRAM[84] === 7) begin
                 $display("Simulation succeeded");
                 $stop;
             end
         end    
 endmodule
-*/
