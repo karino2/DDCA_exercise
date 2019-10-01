@@ -96,18 +96,12 @@ module testbench_mipstest_lwsw(
     
 endmodule
 
-/*
 module testbench_mipstest_beq(
     );
     logic clk, reset;
 
-    logic [31:0] pc;
-    logic [31:0] instr;
-    
-    romcode #("mipstest_beq.mem") InstRom(pc[15:2], instr);
-        
-    all_without_rom dut(clk, reset, instr, pc);
-                     
+    mips_pipeline #("mipstest_beq.mem") dut(clk, reset);
+                         
     initial begin
         clk = 0; reset = 1; #10;
         reset = 0; #10;
@@ -116,14 +110,16 @@ module testbench_mipstest_beq(
         clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
         clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
         clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
-        assert(dut.RegFile.regs[4] === 6) else $error("first jump is occure wrongly, %h", dut.RegFile.regs[4]);
-        assert(dut.RegFile.regs[5] === 7) else $error("second jump is not occure wrongly, %h", dut.RegFile.regs[5]);
-        assert(dut.RegFile.regs[6] === 3) else $error("second jump seems jump too much, %h", dut.RegFile.regs[6]);
+        $display("mips beq test begin");
+        assert(dut.DecodeStage.RegFile.regs[4] === 6) else $error("first jump is occure wrongly, %h", dut.DecodeStage.RegFile.regs[4]);
+        assert(dut.DecodeStage.RegFile.regs[5] === 7) else $error("second jump is not occure wrongly, %h", dut.DecodeStage.RegFile.regs[5]);
+        assert(dut.DecodeStage.RegFile.regs[6] === 3) else $error("second jump seems jump too much, %h", dut.DecodeStage.RegFile.regs[6]);
+        $display("mips beq test end");
     end
     
 endmodule
 
-
+/*
 // Test bench writen in text book 7.6.3.
 module testbench_mipstest_books(
     );
