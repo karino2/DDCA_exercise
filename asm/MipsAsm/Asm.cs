@@ -17,11 +17,11 @@ namespace MipsAsm
             return uint.Parse(regstr.Trim(' ').Substring(1));
         }
 
-        private string AsmI(List<string> args, uint funct)
+        private string AsmI(List<string> args, uint op)
         {
             uint regRs = RegstrToRegnum(args[1]);
             uint regRt = RegstrToRegnum(args[0]);
-            return AsmICommon(args, funct, regRs, regRt);
+            return AsmICommon(args, op, regRs, regRt);
         }
 
         private string AsmBeq(List<string> args)
@@ -31,9 +31,9 @@ namespace MipsAsm
             return AsmICommon(args, 4, regRs, regRt);
         }
 
-        private string AsmICommon(List<string> args, uint funct, uint regRs, uint regRt)
+        private string AsmICommon(List<string> args, uint op, uint regRs, uint regRt)
         {
-            uint word = funct << 26;
+            uint word = op << 26;
 
             word += regRs << 21;
             word += regRt << 16;
@@ -58,8 +58,17 @@ namespace MipsAsm
         public string AsmOne(string line) {
             var nimArg = line.Trim(' ').Split(" ", 2);
             var op = nimArg[0].Trim(' ');
-            var args = SplitArgs(nimArg[1]);
+            if("dsync" == op)
+            {
+                return "30000000";
+            }
+            if("nop" == op)
+            {
+                return "00000000";
+            }
 
+
+            var args = SplitArgs(nimArg[1]);
             if("or" == op)
             {
                 return AsmR(args, 37);
@@ -94,6 +103,14 @@ namespace MipsAsm
             if("lw" == op)
             {
                 return AsmI(args, 35);
+            }
+            if("d2s" == op)
+            {
+                return AsmI(args, 49);
+            }
+            if("s2d" == op)
+            {
+                return AsmI(args, 57);
             }
             if("j" == op)
             {

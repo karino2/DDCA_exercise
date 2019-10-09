@@ -113,5 +113,34 @@ namespace MipsAsm.Tests
             var actual = target.StripComment("// only comment");
             Assert.AreEqual(String.Empty, actual);
         }
+
+        [Test]
+        public void TestD2s()
+        {
+            // d2s $sramaddr, $dramaddr, #width
+            // in binary,
+            // op $dramaddr $sramaddr #width
+            // op code is 110001 (49)
+            var actual = target.AsmOne("d2s $2, $1, 80");
+            // 1100 01_00 001_0 0010 ...
+            Assert.AreEqual("c4220050", actual);
+        }
+
+        [Test]
+        public void TestS2s()
+        {
+            // op code is 111001 (57)
+            var actual = target.AsmOne("s2d $2, $1, 80");
+            // 1110 01_00 001_0 0010 ...
+            Assert.AreEqual("e4220050", actual);
+        }
+
+        [Test]
+        public void TestDsync()
+        {
+            // op code is 001100 (12)
+            var actual = target.AsmOne("dsync");
+            Assert.AreEqual("30000000", actual);
+        }
     }
 }
