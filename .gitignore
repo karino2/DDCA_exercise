@@ -2,3 +2,4 @@ asm/MipsAsm.Tests/bin/
 asm/MipsAsm.Tests/obj/
 asm/MipsAsm/bin/
 asm/MipsAsm/obj/
+TinySIMT/sim/01_mips_single/xsim.dir/
