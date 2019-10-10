@@ -74,7 +74,7 @@ module mips_single #(parameter FILENAME="romdata.mem")
     logic regWriteEnable;
     logic [31:0] regReadData1, regReadData2, regWriteData;
     
-    regfile RegFile(clk, regAddr1, regAddr2, regWriteAddr, regWriteEnable, regWriteData, regReadData1, regReadData2);
+    regfile_single RegFile(clk, regAddr1, regAddr2, regWriteAddr, regWriteEnable, regWriteData, regReadData1, regReadData2);
 
     logic RegWrite, RegDst, ALUSrc, Branch; 
     logic MemWrite, MemtoReg, Jump;

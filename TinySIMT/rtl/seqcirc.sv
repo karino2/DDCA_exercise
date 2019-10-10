@@ -88,6 +88,29 @@ module testbench_romcode();
 endmodule
 */
 
+module regfile_single(
+    input logic clk,
+    input logic [4:0] a1, a2, a3,
+    input logic we3,
+    input logic [31:0] wd3,
+    output logic [31:0] rd1, rd2);
+
+    logic [31:0] regs [31:0];
+
+    always_ff @(posedge clk)
+        if(we3) begin
+            regs[a3] <= wd3;
+            $display("reg write: a3=%h, wd3=%h", a3, wd3);
+        end
+
+    always @(posedge clk)
+        $display("1=%h, 2=%h, 3=%h, 4=%h, 5=%h, 6=%h, 7=%h, 8=%h", regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7], regs[8]);
+        
+    assign rd1 = (a1 == 0)? 0 : regs[a1];
+    assign rd2 = (a2 == 0)?  0 : regs[a2];    
+ endmodule
+
+
 module regfile(
     input logic clk,
     input logic [4:0] a1, a2, a3,
