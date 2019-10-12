@@ -22,23 +22,30 @@ namespace MipsAsm
         {
             uint regRs = RegstrToRegnum(args[1]);
             uint regRt = RegstrToRegnum(args[0]);
-            return AsmICommon(args, op, regRs, regRt);
+            return AsmICommon(op, regRs, regRt, args[2]);
         }
+
+        private string AsmLui(List<string> args)
+        {
+            uint regRt = RegstrToRegnum(args[0]);
+            return AsmICommon(15, 0, regRt, args[1]);
+        }
+
 
         private string AsmBeq(List<string> args)
         {
             uint regRs = RegstrToRegnum(args[0]);
             uint regRt = RegstrToRegnum(args[1]);
-            return AsmICommon(args, 4, regRs, regRt);
+            return AsmICommon(4, regRs, regRt, args[2]);
         }
 
-        private string AsmICommon(List<string> args, uint op, uint regRs, uint regRt)
+        private string AsmICommon(uint op, uint regRs, uint regRt, String imm)
         {
             uint word = op << 26;
 
             word += regRs << 21;
             word += regRt << 16;
-            word |= (0xffff & (uint)int.Parse(args[2]));
+            word |= (0xffff & (uint)int.Parse(imm));
             return String.Format("{0:x8}", word);
         }
 
@@ -109,6 +116,9 @@ namespace MipsAsm
             if("addi" == op) {
                 return AsmI(args, 8);
             }
+            if("ori" == op) {
+                return AsmI(args, 13);
+            }
             if("sw" == op)
             {
                 return AsmI(args, 43);
@@ -124,6 +134,9 @@ namespace MipsAsm
             if("s2d" == op)
             {
                 return AsmI(args, 57);
+            }
+            if("lui" == op) {
+                return AsmLui(args);
             }
             if("j" == op)
             {

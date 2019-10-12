@@ -6,16 +6,15 @@ module testbench_mipstest_add(
     logic clk, reset;
 
     logic [31:0] sramReadData, sramAddress, sramWriteData, dmaSrcAddress, dmaDstAddress;
-    logic sramWriteEnable, halt, dmaValid;
+    logic sramWriteEnable, halt;
     logic [1:0] dmaCmd;
     logic [9:0] dmaWidth;    
     sram DataMem(clk, sramAddress[13:0], sramWriteEnable, sramWriteData, sramReadData);
 
     mips_single #("mipstest_add.mem") dut(clk, reset, 1'b0, sramReadData, sramAddress, sramWriteData, sramWriteEnable,
-                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, dmaValid, halt);
+                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, 1'b0, halt);
                      
     initial begin
-        dmaValid = 0;
         clk = 0; reset = 1; #10;
         // $display("next instr address=%h, nextInstr=%h", pc, instr);
         reset = 0; clk = 1; #10;
@@ -29,6 +28,29 @@ module testbench_mipstest_add(
     
 endmodule
 
+module testbench_luiori(
+    );
+    logic clk, reset;
+
+    logic [31:0] sramReadData, sramAddress, sramWriteData, dmaSrcAddress, dmaDstAddress;
+    logic sramWriteEnable, halt;
+    logic [1:0] dmaCmd;
+    logic [9:0] dmaWidth;    
+    sram DataMem(clk, sramAddress[13:0], sramWriteEnable, sramWriteData, sramReadData);
+
+    mips_single #("luiori_test.mem") dut(clk, reset, 1'b0, sramReadData, sramAddress, sramWriteData, sramWriteEnable,
+                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, 1'b0, halt);
+                     
+    initial begin
+        clk = 0; reset = 1; #10; reset = 0; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk = 0; #10;
+        assert(dut.RegFile.regs[1] === 32'h04d2162e) else $error("fail lui ori, %h", dut.RegFile.regs[1]);
+        $display("mips lui ori test done");
+    end
+    
+endmodule
 
 module testbench_mipssingle_d2s_one(
     );
@@ -84,20 +106,7 @@ module testbench_dmac_d2s(
     logic [1:0] dmaCmd;
     logic [9:0] dmaWidth;    
     sram DataMem(clk, sramAddress[13:0], sramWriteEnable, sramWriteData, sramReadData);
-/*
-module dma_ctrl(input logic clk, reset, 
-                input logic [1:0] cmd,
-                input logic [31:0] srcAddr, destAddr,
-                input logic [9:0] width,
-                input logic [31:0] sramReadData, dramReadData, 
-                output logic [13:0] sramAddress,
-                output logic [31:0] sramWriteData,
-                output logic sramWriteEnable,
-                output logic [31:0] dramAddress, dramWriteData,
-                output logic dramWriteEnable, dramReadEnable,
-                input logic dramValid,
-                output logic stall, dmaValid);
-*/
+
     dma_ctrl dut(clk, reset, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth,
                 sramReadData, dramReadData,
                 sramAddress, sramWriteData, sramWriteEnable,

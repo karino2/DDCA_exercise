@@ -24,19 +24,26 @@
 
 module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct, 
     output logic RegWrite, output logic RegDst, output logic ALUSrc, output logic Branch, 
-    output logic MemWrite, output logic MemtoReg, output logic [2:0] ALUCtrl, output logic Jump, output logic Halt,
+    output logic MemWrite, output logic MemtoReg, logic ImmtoReg, output logic [2:0] ALUCtrl, output logic Jump, output logic Halt,
     output logic [1:0] dmaCmd //00: nothing  01: d2s   02:s2d 
     );
     
-    assign RegWrite = ((Opcode == 0) | (Opcode == 6'b100011) | (Opcode == 6'b001000));
+    assign RegWrite = ((Opcode == 0) | (Opcode == 6'b100011)
+         | (Opcode == 6'b001000) // addi
+        | (Opcode == 6'b001111) // lui
+        | (Opcode==6'b001101)); // ori
     assign RegDst = Opcode == 0;
-    assign ALUSrc = ((Opcode != 0) & (Opcode != 6'b000100));
+    assign ALUSrc = ((Opcode != 0) &
+         ((Opcode != 6'b000100))); // beq
     assign Branch = Opcode == 6'b000100;
     assign MemWrite = Opcode == 6'b101011;
     assign MemtoReg = Opcode == 6'b100011;
+    assign ImmtoReg = Opcode == 6'b001111; // lui
     always_comb
         if(Opcode == 6'b000100)
             ALUCtrl = 3'b110;
+        else if(Opcode == 6'b001101) // ori
+            ALUCtrl = 3'b001;
         else
             case(Funct)
                 6'd34: ALUCtrl = 3'b110;
@@ -117,10 +124,10 @@ module mips_single #(parameter FILENAME="romdata.mem")
     regfile_single RegFile(clk, regAddr1, regAddr2, regWriteAddr, regWriteEnable, regWriteData, regReadData1, regReadData2);
 
     logic RegWrite, RegDst, ALUSrc, Branch; 
-    logic MemWrite, MemtoReg, Jump;
+    logic MemWrite, MemtoReg, ImmtoReg, Jump;
     logic [2:0] ALUCtrl;
         
-    ctrlunit CtrlUnit(instr[31:26], instr[5:0], RegWrite, RegDst, ALUSrc, Branch, MemWrite, MemtoReg, ALUCtrl, Jump, Halt, dmaCmd);
+    ctrlunit CtrlUnit(instr[31:26], instr[5:0], RegWrite, RegDst, ALUSrc, Branch, MemWrite, MemtoReg, ImmtoReg, ALUCtrl, Jump, Halt, dmaCmd);
 
     assign regWriteAddr = RegDst? instr[15:11] : instr[20:16]; 
     assign regAddr1 = instr[25:21];
@@ -158,7 +165,7 @@ module mips_single #(parameter FILENAME="romdata.mem")
             end
  
     
-    mux2 ResForReg(alures, sramReadData, MemtoReg, regWriteData);
+    assign regWriteData = MemtoReg ? sramReadData : (ImmtoReg? {signImm[15:0], 16'b0} : alures);
  
     logic [31:0] pcPlus4, pcBranch, pcCand1, pcJump;
     

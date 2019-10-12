@@ -64,6 +64,14 @@ module mux2(input logic [31:0] d0, d1,
     assign y = s ? d1 : d0;
 endmodule
 
+/*
+010: add
+110: subtract
+000: and
+001: or
+111: set less than
+
+*/
 module alu(
     input logic [31:0] a, b,
     input logic [2:0] f,

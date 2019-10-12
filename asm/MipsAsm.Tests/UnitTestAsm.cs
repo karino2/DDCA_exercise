@@ -33,6 +33,20 @@ namespace MipsAsm.Tests
             Assert.AreEqual("2067fff7", actual);
         }
 
+        [Test]
+        public void TestOri()
+        {
+            var actual = target.AsmOne("ori $2, $0, 5");
+            Assert.AreEqual("34020005", actual);
+        }
+
+        [Test]
+        public void TestLui()
+        {
+            // 0011 11_00 000_0 0010 0 0 0101 0000  
+            var actual = target.AsmOne("lui $2, 80");
+            Assert.AreEqual("3c020050", actual);
+        }
 
         [Test]
         public void TestOr()
