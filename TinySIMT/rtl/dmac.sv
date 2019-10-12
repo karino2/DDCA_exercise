@@ -86,7 +86,7 @@ endmodule
 
 module dma_ctrl(input logic clk, reset, 
                 input logic [1:0] cmd,
-                input logic [31:0] srcAddress, destAddress,
+                input logic [31:0] srcAddress, dstAddress,
                 input logic [9:0] width,
                 input logic [31:0] sramReadData, dramReadData, 
                 output logic [13:0] sramAddress,
@@ -116,6 +116,11 @@ module dma_ctrl(input logic clk, reset,
             curDramAddress <= nextDramAddress;
         end
 
+    /*
+    always @(posedge clk)
+        $display("state=%b, address. %h, %h, %h, %h", state, nextSramAddress, nextDramAddress, curSramAddress, curDramAddress);
+    */
+
     always_comb
         case(state)
             DORMANT:
@@ -129,20 +134,21 @@ module dma_ctrl(input logic clk, reset,
             D2S_BEGIN:
                 begin
                     rest = width;
-                    nextSramAddress = destAddress;
+                    nextSramAddress = dstAddress;
                     nextDramAddress = srcAddress;
                     nextstate = D2S_READ_REQUEST;
                 end
             D2S_READ_REQUEST:
                 begin
                     // read request to dram
-                    dramAddress = nextDramAddress;
+                    dramAddress = curDramAddress;
                     dramReadEnable = 1;
                     nextstate = dramValid? D2S_WRITE: D2S_READ_REQUEST;
                     curData = dramReadData;
                 end
             D2S_WRITE:
                 begin
+                    dramReadEnable = 0;
                     sramAddress = curSramAddress;
                     sramWriteData = curData;
                     sramWriteEnable = 1;
@@ -169,7 +175,11 @@ module dma_ctrl(input logic clk, reset,
                     nextstate = DORMANT;
                 end
 
-            default: nextstate = DORMANT;
+            default:
+                begin
+                    dmaValid = 0;
+                    nextstate = DORMANT;
+                end
         endcase
 
     assign stall = (nextstate != DORMANT);
