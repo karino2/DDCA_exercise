@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 /*
 Use imm value (digit) instead of label.
@@ -55,7 +56,16 @@ namespace MipsAsm
             return argstr.Split(",").Select(arg => arg.Trim(' ')).ToList();
         }
 
+        Regex whitePat = new Regex(@"^\s*$");
+
+        bool IsEmptyLine(string line) {
+            return whitePat.IsMatch(line);
+        }
+
         public string AsmOne(string line) {
+            if(IsEmptyLine(line))
+                return String.Empty;
+
             var nimArg = line.Trim(' ').Split(" ", 2);
             var op = nimArg[0].Trim(' ');
             if("dsync" == op)
@@ -157,10 +167,15 @@ namespace MipsAsm
                 while (line != null)
                 {
                     line = assembler.StripComment(line);
-                    var res = assembler.AsmOne(line);
-                    if (!String.IsNullOrEmpty(res))
-                        sw.WriteLine(res);
-                    line = sr.ReadLine();
+                    try {
+                        var res = assembler.AsmOne(line);
+                        if (!String.IsNullOrEmpty(res))
+                            sw.WriteLine(res);
+                        line = sr.ReadLine();
+                    }catch(System.IndexOutOfRangeException exi) {
+                        System.Console.WriteLine($"Index out of range exception: line: {line}, ex: {exi.Message}");
+                        return;
+                    }
                 }
             }catch(IOException ex) {
                 System.Console.WriteLine($"IOException: {ex.Message}");
