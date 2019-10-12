@@ -1,4 +1,4 @@
-$targetRtlNames = "alu.sv", "mips_single.sv", "seqcirc.sv"
+$targetRtlNames = "alu.sv", "mips_single.sv", "seqcirc.sv", "dmac.sv"
 $testBenchFile = "tb.sv"
 
 $vivadoPath = "C:\Xilinx\Vivado\2019.1\bin";
