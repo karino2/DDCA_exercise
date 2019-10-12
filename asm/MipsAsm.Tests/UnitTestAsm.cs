@@ -127,7 +127,7 @@ namespace MipsAsm.Tests
         }
 
         [Test]
-        public void TestS2s()
+        public void TestS2d()
         {
             // op code is 111001 (57)
             var actual = target.AsmOne("s2d $2, $1, 80");

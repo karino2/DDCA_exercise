@@ -66,7 +66,10 @@ namespace MipsAsm
             {
                 return "00000000";
             }
-
+            if("halt" == op)
+            {
+                return "38000000";
+            }
 
             var args = SplitArgs(nimArg[1]);
             if("or" == op)
