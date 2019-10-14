@@ -1,4 +1,4 @@
-module jtag_adapter(input logic clk, reset, 
+module jtag_adapter(input logic clk, 
     input logic [31:0] dramAddress, dramWriteData,
     input logic readEnable, writeEnable,
     output logic [31:0] dramReadData,
@@ -95,25 +95,57 @@ module dma_ctrl(input logic clk, reset,
                 output logic [31:0] dramAddress, dramWriteData,
                 output logic dramWriteEnable, dramReadEnable,
                 input logic dramValid,
-                output logic stall, dmaValid);
+                output logic stall);
 
-    typedef enum logic [2:0] {DORMANT, D2S_BEGIN, D2S_READ_REQUEST, D2S_WRITE, D2S_ONE_COMP, DONE} statetype;
-    statetype [2:0] state, nextstate;
-    logic [31:0] curSramAddress, curDramAddress, curData, nextSramAddress, nextDramAddress;
+    typedef enum logic [2:0] {DORMANT, D2S_BEGIN, D2S_READ_REQUEST, D2S_WRITE, D2S_ONE_COMP, D2S_DONE_OR_NEXT, DONE} statetype;
+    statetype state, nextstate;
+    logic [31:0] curData, nextSramAddress, nextDramAddress;
     logic [9:0] rest;
+
+    /*
+    always @(posedge clk)
+        $display("dmac: state=%h", state);
+        */
+
 
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
              state <= DORMANT;
-             sramWriteEnable = 0;
-             dramWriteEnable = 0;
-             dramReadEnable = 0;
-             dmaValid = 0;
         end
         else begin
             state <= nextstate;
-            curSramAddress <= nextSramAddress;
-            curDramAddress <= nextDramAddress;
+            case(nextstate)
+                D2S_BEGIN:
+                    begin
+                        rest <= width;
+                        nextSramAddress <= dstAddress;
+                        nextDramAddress <= srcAddress;
+                    end
+                D2S_READ_REQUEST:
+                    begin
+                        // read request to dram, wait until dramValid.
+                        sramAddress <= nextSramAddress[15:2];
+                        dramAddress <= nextDramAddress;
+                        curData <= dramReadData;
+                    end
+                D2S_WRITE:
+                    begin
+                        // TODO: how to fix this more correctly?
+                        if(dramValid)
+                            begin
+                                curData <= dramReadData;
+                                sramWriteData <= dramReadData;
+                            end
+                        else
+                            sramWriteData <= curData;
+                    end
+                D2S_ONE_COMP:
+                    begin
+                        rest <= rest-1;
+                        nextDramAddress <= nextDramAddress+4;
+                        nextSramAddress <= nextSramAddress+4;
+                    end
+            endcase
         end
 
     /*
@@ -121,67 +153,40 @@ module dma_ctrl(input logic clk, reset,
         $display("state=%b, address. %h, %h, %h, %h", state, nextSramAddress, nextDramAddress, curSramAddress, curDramAddress);
     */
 
+    // assign dmaValid = (state == DONE);
+    assign dramWriteEnable = 1'b0; // (state == S2D_WRITE);
+    assign sramWriteEnable = (state == D2S_WRITE);
+    assign dramReadEnable = (state == D2S_READ_REQUEST);
+
+    // assign nextstate = (cmd == 2'b01) ? D2S_BEGIN: DORMANT;
+
     always_comb
         case(state)
             DORMANT:
-                begin
-                    dmaValid = 0;
-                    case(cmd)
-                        2'b01: nextstate = D2S_BEGIN;
-                        default: nextstate = DORMANT;
-                    endcase
-                end
+                case(cmd)
+                    2'b01: nextstate = D2S_BEGIN;
+                    default: nextstate = DORMANT;
+                endcase
             D2S_BEGIN:
-                begin
-                    rest = width;
-                    nextSramAddress = dstAddress;
-                    nextDramAddress = srcAddress;
-                    nextstate = D2S_READ_REQUEST;
-                end
+                nextstate = D2S_READ_REQUEST;
             D2S_READ_REQUEST:
-                begin
-                    // read request to dram
-                    dramAddress = curDramAddress;
-                    dramReadEnable = 1;
-                    nextstate = dramValid? D2S_WRITE: D2S_READ_REQUEST;
-                    curData = dramReadData;
-                end
+                // read request to dram
+                nextstate = dramValid? D2S_WRITE: D2S_READ_REQUEST;
             D2S_WRITE:
-                begin
-                    dramReadEnable = 0;
-                    sramAddress = curSramAddress;
-                    sramWriteData = curData;
-                    sramWriteEnable = 1;
-                    nextstate = D2S_ONE_COMP;
-                end
+                nextstate = D2S_ONE_COMP;
             D2S_ONE_COMP:
-                begin
-                    sramWriteEnable = 0;
-                    rest = rest-1;
-                    case(rest)
-                        0:
-                            nextstate = DONE;                            
-                        default:
-                            begin
-                                nextDramAddress = curDramAddress+4;
-                                nextSramAddress = curSramAddress+4;
-                                nextstate = D2S_READ_REQUEST;
-                            end
-                    endcase
-                end
+                nextstate = D2S_DONE_OR_NEXT;
+            D2S_DONE_OR_NEXT:
+                if(rest == 10'b0)
+                    nextstate = DONE;
+                else
+                    nextstate = D2S_READ_REQUEST;
             DONE:
-                begin
-                    dmaValid = 1;
-                    nextstate = DORMANT;
-                end
-
+                nextstate = DORMANT;
             default:
-                begin
-                    dmaValid = 0;
-                    nextstate = DORMANT;
-                end
+                nextstate = DORMANT;
         endcase
 
-    assign stall = (nextstate != DORMANT);
+    assign stall = (state != DORMANT);
 
 endmodule

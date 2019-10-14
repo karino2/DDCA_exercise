@@ -1,7 +1,10 @@
 # $testBenchName="testbench_mipstest_add"
-# $testBenchName="testbench_d2s_one"
+# $testBenchName="testbench_mipssingle_d2s_one"
 # $testBenchName="testbench_dmac_d2s"
-$testBenchName="testbench_luiori"
+# testBenchName="testbench_luiori"
+# $testBenchName="testbench_halt"
+# $testBenchName="testbench_d2stest_cpuonly"
+$testBenchName="testbench_d2stest_check_led"
 
 $vivadoPath = "C:\Xilinx\Vivado\2019.1\bin";
 

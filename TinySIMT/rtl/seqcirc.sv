@@ -100,7 +100,8 @@ module regfile_single(
     always_ff @(posedge clk)
         if(we3) begin
             regs[a3] <= wd3;
-            $display("reg write: a3=%h, wd3=%h", a3, wd3);
+            if(a3 != 0)
+                $display("reg write: a3=%h, wd3=%h", a3, wd3);
         end
 
     always @(posedge clk)
@@ -166,9 +167,13 @@ module sram(input logic clk,
             input logic [31:0] wd,
             output logic [31:0] rd);
     logic [31:0] SRAM [16*1024-1:0];
-    
+
+    // assume 4 byte align, no check.
     always_ff @(posedge clk)
-        if(we) SRAM[addr] <= wd;
+        if(we) begin 
+            SRAM[addr] <= wd;
+            $display("sram write, %h, %h", addr, wd);
+        end
         
     assign rd = SRAM[addr];
 endmodule

@@ -84,16 +84,15 @@ module mips_single #(parameter FILENAME="romdata.mem")
         output logic [1:0] dmaCmd, //00: nothing  01: d2s   10:s2d 
         output logic [31:0] dmaSrcAddress, dmaDstAddress, 
         output logic [9:0] dmaWidth,
-        input logic dmaValid, // notify done.
         output logic halt);
-    logic [31:0] rawPC, pc, newPC;
+    logic [31:0] pc, newPC;
     logic [31:0] instr, instrRead;
     logic halted, Halt;
 
-    flopr Pcflop(clk, reset, !stall & !halted, newPC, rawPC);
+    flopr Pcflop(clk, reset, !stall & !halted, newPC, pc);
 
     // skip DMA command that already invoked.
-    assign pc = dmaValid ? rawPC+4 : rawPC;
+    // assign pc = dmaValid ? rawPC+4 : rawPC;
 
     romcode #(FILENAME) InstRom(pc[15:2], instrRead);
     assign instr = stall ? 0 : instrRead;
@@ -108,7 +107,7 @@ module mips_single #(parameter FILENAME="romdata.mem")
                 halted <= 1;
 
     always @(posedge clk)
-        $display("instr %h, pc %h, opcode=%b, dmaCmd=%b", instr, pc, instr[31:26], dmaCmd);
+        $display("instr %h, pc %h, opcode=%b, dmaCmd=%b, stall %b", instr, pc, instr[31:26], dmaCmd, stall);
 
     /*
     logic [31:0] sramReadData, memAddress, sramWriteData;
@@ -177,4 +176,77 @@ module mips_single #(parameter FILENAME="romdata.mem")
     assign pcCand1 = (zero & Branch) ? pcBranch : pcPlus4;
     assign newPC = Jump?pcJump : pcCand1;
         
+endmodule
+
+module mips_single_sram_dmac_led #(parameter FILENAME="romdata.mem") 
+    (input logic clk, reset, 
+        output logic halt,
+        output logic [3:0] led,
+        output logic [31:0] dramAddress, dramWriteData,
+        output logic dramWriteEnable, dramReadEnable,
+        input logic [31:0] dramReadData,
+        input logic dramValid
+    );
+
+    logic [31:0] sramReadData, sramWriteData, dmaSrcAddress, dmaDstAddress;
+    logic [13:0] sramAddress, sramAddressForDMAC;
+    logic [31:0] sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU;
+    logic sramWriteEnableForCPU;
+    logic [31:0] sramReadDataForDMAC, sramWriteDataForDMAC;
+    logic sramWriteEnableForDMAC;
+
+    logic sramWriteEnable, stall;
+    logic [1:0] dmaCmd;
+    logic [9:0] dmaWidth;
+    sram DataMem(clk, sramAddress, sramWriteEnable, sramWriteData, sramReadData);
+
+    mips_single #(FILENAME) u_cpu(clk, reset, stall, sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU, sramWriteEnableForCPU,
+                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
+
+    dma_ctrl u_dmac(clk, reset, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth,
+                sramReadDataForDMAC, dramReadData,
+                sramAddressForDMAC, sramWriteDataForDMAC, sramWriteEnableForDMAC,
+                dramAddress, dramWriteData, dramWriteEnable, dramReadEnable,
+                dramValid, stall);
+
+    /*
+    led map
+    0x8000_0000: led[0]
+    0x8000_0004: led[1]
+    0x8000_0008: led[2]
+    */
+    always_ff @(posedge clk, posedge reset)
+        if(reset)
+            led <= 3'b0;
+        else if(sramWriteEnableForCPU & sramAddressForCPU[31])
+            case(sramAddressForCPU[3:0])
+                4'b0: led[0] <= sramWriteDataForCPU[0];
+                4'b100: led[1] <= sramWriteDataForCPU[0];
+                4'b1000: led[2] <= sramWriteDataForCPU[0];
+            endcase
+
+  always_comb
+    if(stall)
+      begin
+        sramAddress = sramAddressForDMAC;
+        sramWriteEnable = sramWriteEnableForDMAC;
+        sramWriteData = sramWriteDataForDMAC;
+        sramReadDataForDMAC = sramReadData;
+      end
+    else
+        if(sramAddressForCPU[31])
+            begin
+                sramAddress = 14'b0;
+                sramWriteEnable = 0;
+                sramWriteData = 32'b0;
+                sramReadDataForCPU = 32'b0;        
+            end
+        else
+            begin
+                sramAddress = sramAddressForCPU[15:2];
+                sramWriteEnable = sramWriteEnableForCPU;
+                sramWriteData = sramWriteDataForCPU;
+                sramReadDataForCPU = sramReadData;        
+            end
+
 endmodule
