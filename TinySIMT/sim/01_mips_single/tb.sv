@@ -296,34 +296,10 @@ module testbench_d2stest_check_led(
     logic clk, reset;
 
     logic halt;
-    logic [3:0] ledval; 
+    logic [2:0] ledval; 
     logic dramWriteEnable, dramReadEnable, dramValid;
     logic [31:0] dramAddress, dramWriteData, dramReadData;
-    mips_single_sram_dmac_led #("d2s_test.mem")
-      dut(clk, reset, 
-        halt,
-        ledval,
-        dramAddress, dramWriteData,
-        dramWriteEnable, dramReadEnable,
-        dramReadData,
-        dramValid
-    );
 
-
-    /*
-    logic [31:0] sramReadData, sramWriteData, dmaSrcAddress, dmaDstAddress,
-                dramReadData, dramAddress, dramWriteData;
-    logic [13:0] sramAddress, sramAddressForDMAC;
-    logic [31:0] sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU;
-    logic sramWriteEnableForCPU;
-    logic [31:0] sramReadDataForDMAC, sramWriteDataForDMAC;
-    logic sramWriteEnableForDMAC;
-
-    logic sramWriteEnable, halt, stall, dramWriteEnable, dramReadEnable, dramValid;
-    logic [1:0] dmaCmd;
-    logic [9:0] dmaWidth;    
-    sram DataMem(clk, sramAddress, sramWriteEnable, sramWriteData, sramReadData);
-*/
     /*
     // assume in DDR,
     // 24: 123
@@ -336,52 +312,15 @@ module testbench_d2stest_check_led(
     0x8000_0004: led[1]
     0x8000_0008: led[2]
 */
-/*
-    mips_single #("d2s_test.mem") u_cpu(clk, reset, stall, sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU, sramWriteEnableForCPU,
-                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
-
-    dma_ctrl u_dmac(clk, reset, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth,
-                sramReadDataForDMAC, dramReadData,
-                sramAddressForDMAC, sramWriteDataForDMAC, sramWriteEnableForDMAC,
-                dramAddress, dramWriteData, dramWriteEnable, dramReadEnable,
-                dramValid, stall);
-
-    logic [2:0] ledval;
-
-    always_ff @(posedge clk, posedge reset)
-        if(reset)
-            ledval <= 3'b0;
-        else if(sramWriteEnableForCPU & sramAddressForCPU[31])
-            case(sramAddressForCPU[3:0])
-                4'b0: ledval[0] <= sramWriteDataForCPU[0];
-                4'b100: ledval[1] <= sramWriteDataForCPU[0];
-                4'b1000: ledval[2] <= sramWriteDataForCPU[0];
-            endcase
-
-  always_comb
-    if(stall)
-      begin
-        sramAddress = sramAddressForDMAC;
-        sramWriteEnable = sramWriteEnableForDMAC;
-        sramWriteData = sramWriteDataForDMAC;
-        sramReadDataForDMAC = sramReadData;
-      end
-    else
-        if(sramAddressForCPU[31])
-            begin
-                sramAddress = 14'b0;
-                sramWriteEnable = 0;
-                sramWriteData = 32'b0;
-                sramReadDataForCPU = 32'b0;        
-            end
-        else
-            begin
-                sramAddress = sramAddressForCPU[15:2];
-                sramWriteEnable = sramWriteEnableForCPU;
-                sramWriteData = sramWriteDataForCPU;
-                sramReadDataForCPU = sramReadData;        
-            end
-*/
+    mips_single_sram_dmac_led #("d2s_test.mem")
+      dut(clk, reset, 
+        halt,
+        ledval,
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
 
     initial begin
         dramValid = 0;
@@ -443,8 +382,104 @@ module testbench_d2stest_check_led(
         clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
         clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
         assert(ledval === 3'b111) else $error("ledval wrong, %b", ledval);
+        assert(halt) else $error("not halted %b", halt);
         $display("d2s_test check led done");
     end
     
 endmodule
 
+
+/*
+This is rather test of asm.
+*/
+module testbench_d2stest_failcase(
+    );
+    logic clk, reset;
+
+    logic halt;
+    logic [2:0] ledval; 
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+    /*
+    // assume in DDR,
+    // 24: 123
+    // 28: 456
+    // 32: 789
+    // 34: 5555
+    
+    // give wrong value for test.
+
+    led map
+    0x8000_0000: led[0]
+    0x8000_0004: led[1]
+    0x8000_0008: led[2]
+*/
+    mips_single_sram_dmac_led #("d2s_test.mem")
+      dut(clk, reset, 
+        halt,
+        ledval,
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+    initial begin
+        dramValid = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10;
+        clk = 1; #10; 
+        // $display("deb1, %h", dmaDstAddress);
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        dramReadData = 111;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        dramReadData = 111;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        dramReadData = 111;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        dramReadData = 111;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(ledval === 3'b101) else $error("ledval wrong, %b", ledval);
+        assert(halt) else $error("not halted %b", halt);
+        $display("d2s_test check led done");
+    end
+    
+endmodule

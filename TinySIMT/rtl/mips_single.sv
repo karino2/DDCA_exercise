@@ -181,7 +181,7 @@ endmodule
 module mips_single_sram_dmac_led #(parameter FILENAME="romdata.mem") 
     (input logic clk, reset, 
         output logic halt,
-        output logic [3:0] led,
+        output logic [2:0] led,
         output logic [31:0] dramAddress, dramWriteData,
         output logic dramWriteEnable, dramReadEnable,
         input logic [31:0] dramReadData,

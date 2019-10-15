@@ -33,7 +33,7 @@ beq $1, $3, 3 // goto success.
 sw   $5, $4, 0  // addr: 0x0040
 sw   $5, $4, 8
 
-j 104  // jump to 0x0000_0058, halt
+j 22  // jump to 0x0000_0058, halt. 88/4
 
 // success, turn on three led.
 sw   $5, $4, 0

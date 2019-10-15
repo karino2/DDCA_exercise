@@ -522,6 +522,7 @@ module arty_top (
   output [1:0]  ddr3_dm,
   output [0:0]  ddr3_odt,
   output [3:0]  led,
+  input [3:0] btn,
   input         sys_clk,
   input         sys_rstn
   );
@@ -700,7 +701,7 @@ module arty_top (
     .ddr3_dm(ddr3_dm),
     .ddr3_odt(ddr3_odt),
     .sys_clk(sys_clk),
-    .sys_rstn(sys_rstn),
+    .sys_rstn(sys_rstn & !btn[0]),
 
 /*
     .m_axi_awid(m2_axi_awid),
@@ -777,6 +778,23 @@ module arty_top (
   );
 
 
+    logic halt;
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+  // TODO: use sys_clk and cross domain to dma_ctrl.
+    mips_single_sram_dmac_led #("d2s_test.mem")
+      u_mips_sram_dmac_led(ui_clk, !ui_rstn, 
+        halt,
+        led[2:0],
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+
+  /*
   logic [31:0] sramReadDataForDMAC, sramAddressForDMAC, sramWriteDataForDMAC;
   logic sramWriteEnableForDMAC;
   logic [31:0] sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU;
@@ -785,23 +803,26 @@ module arty_top (
   logic sramWriteEnable, halt, dmaValid, stall;
   logic [1:0] dmaCmd;
   logic [9:0] dmaWidth;
+  */
 
 
-  // TODO: use sys_clk and cross domain to dma_ctrl.
+  /*
   sram DataMem(ui_clk, sramAddress[13:0], sramWriteEnable, sramWriteData, sramReadData);
 
   mips_single #("d2s_test.mem") u_mps(ui_clk, ui_rstn, stall, sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU, sramWriteEnableForCPU,
                                       dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, dmaValid, halt);
+                                      */
 
 /*
   mips_single #("halt_test.mem") u_mps(ui_clk, !ui_rstn, stall, sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU, sramWriteEnableForCPU,
                                       dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, dmaValid, halt);
                                       */
 
-  logic [2:0] ledval;
+  // logic [2:0] ledval;
   // LED handling.
   // Assign 0x8000_000X for LED. led[3] is assign to show halt.
 
+  /*
   always_ff @(posedge ui_clk, negedge ui_rstn)
     if(!ui_rstn)
       ledval <= 3'b0;
@@ -811,9 +832,10 @@ module arty_top (
         4'b100: ledval[1] <= sramWriteDataForCPU[0];
         4'b1000: ledval[2] <= sramWriteDataForCPU[0];
       endcase
+      */
 
 
-  assign led[2:0] = ledval;
+  // assign led[2:0] = ledval;
   /*
   assign led[0] = stall;
   assign led[1] = ui_rstn;
@@ -821,7 +843,7 @@ module arty_top (
   */
   assign led[3] = halt;
 
-
+  /*
   always_comb
     if(stall)
       begin
@@ -855,6 +877,7 @@ module arty_top (
               sramAddressForDMAC, sramWriteDataForDMAC, sramWriteEnableForDMAC,
               dramAddress, dramWriteData, dramWriteEnable, dramReadEnable,
               dramValid, stall, dmaValid);
+  */
 
   jtag_adapter u_jtag_adapter (
     .clk(ui_clk),                     // input wire aclk
@@ -900,6 +923,7 @@ module arty_top (
     .m_axi_rready(m1_axi_rready)     // output wire m_axi_rready
   );
 
+// mux_axi u_mux_axi(1,
 mux_axi u_mux_axi(halt,
    // axi1
    m1_axi_awid,
