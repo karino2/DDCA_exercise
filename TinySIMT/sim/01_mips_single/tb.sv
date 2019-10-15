@@ -483,3 +483,130 @@ module testbench_d2stest_failcase(
     end
     
 endmodule
+
+module testbench_jtag_adapter(
+    );
+    logic clk;
+
+    logic [31:0] dramAddress, dramReadData, dramWriteData;
+    logic dramWriteEnable, dramReadEnable, dramValid;
+
+    logic [3:0]m_axi_awid;
+    logic [31:0]m_axi_awaddr;
+    logic [7:0]m_axi_awlen;
+    logic [2:0]m_axi_awsize;
+    logic [1:0]m_axi_awburst;
+    logic m_axi_awlock;
+    logic [3:0]m_axi_awcache;
+    logic [2:0]m_axi_awprot;
+    logic m_axi_awvalid;
+    logic m_axi_awready;
+    logic [31:0]m_axi_wdata;
+    logic [3:0]m_axi_wstrb;
+    logic m_axi_wlast;
+    logic m_axi_wvalid;
+    logic m_axi_wready;
+    logic [3:0]m_axi_bid;
+    logic [1:0]m_axi_bresp;
+    logic m_axi_bvalid;
+    logic m_axi_bready;
+    logic [3:0]m_axi_arid;
+    logic [31:0]m_axi_araddr;
+    logic [7:0]m_axi_arlen;
+    logic [2:0]m_axi_arsize;
+    logic [1:0]m_axi_arburst;
+    logic m_axi_arlock;
+    logic [3:0]m_axi_arcache;
+    logic [2:0]m_axi_arprot;
+    logic [3:0]m_axi_arqos;
+    logic m_axi_arvalid;
+    logic m_axi_arready;
+    logic [3:0]m_axi_rid;
+    logic [31:0]m_axi_rdata;
+    logic [1:0]m_axi_rresp;
+    logic m_axi_rlast;
+    logic m_axi_rvalid;
+    logic m_axi_rready;
+
+
+  jtag_adapter dut (
+    .clk(clk),                     // input wire aclk
+    .dramAddress(dramAddress), .dramWriteData(dramWriteData),
+    .readEnable(dramReadEnable), .writeEnable(dramWriteEnable),
+    .dramReadData(dramReadData),
+    .dramValid(dramValid),
+
+    .m_axi_awid(m_axi_awid),        // output wire [3 : 0] m_axi_awid
+    .m_axi_awaddr(m_axi_awaddr),    // output wire [31 : 0] m_axi_awaddr
+    .m_axi_awlen(m_axi_awlen),      // output wire [7 : 0] m_axi_awlen
+    .m_axi_awsize(m_axi_awsize),    // output wire [2 : 0] m_axi_awsize
+    .m_axi_awburst(m_axi_awburst),  // output wire [1 : 0] m_axi_awburst
+    .m_axi_awlock(m_axi_awlock),    // output wire m_axi_awlock
+    .m_axi_awcache(m_axi_awcache),  // output wire [3 : 0] m_axi_awcache
+    .m_axi_awprot(m_axi_awprot),    // output wire [2 : 0] m_axi_awprot
+    .m_axi_awvalid(m_axi_awvalid),  // output wire m_axi_awvalid
+    .m_axi_awready(m_axi_awready),  // input wire m_axi_awready
+    .m_axi_wdata(m_axi_wdata),      // output wire [31 : 0] m_axi_wdata
+    .m_axi_wstrb(m_axi_wstrb),      // output wire [3 : 0] m_axi_wstrb
+    .m_axi_wlast(m_axi_wlast),      // output wire m_axi_wlast
+    .m_axi_wvalid(m_axi_wvalid),    // output wire m_axi_wvalid
+    .m_axi_wready(m_axi_wready),    // input wire m_axi_wready
+    .m_axi_bid(m_axi_bid),          // input wire [3 : 0] m_axi_bid
+    .m_axi_bresp(m_axi_bresp),      // input wire [1 : 0] m_axi_bresp
+    .m_axi_bvalid(m_axi_bvalid),    // input wire m_axi_bvalid
+    .m_axi_bready(m_axi_bready),    // output wire m_axi_bready
+    .m_axi_arid(m_axi_arid),        // output wire [3 : 0] m_axi_arid
+    .m_axi_araddr(m_axi_araddr),    // output wire [31 : 0] m_axi_araddr
+    .m_axi_arlen(m_axi_arlen),      // output wire [7 : 0] m_axi_arlen
+    .m_axi_arsize(m_axi_arsize),    // output wire [2 : 0] m_axi_arsize
+    .m_axi_arburst(m_axi_arburst),  // output wire [1 : 0] m_axi_arburst
+    .m_axi_arlock(m_axi_arlock),    // output wire m_axi_arlock
+    .m_axi_arcache(m_axi_arcache),  // output wire [3 : 0] m_axi_arcache
+    .m_axi_arprot(m_axi_arprot),    // output wire [2 : 0] m_axi_arprot
+    .m_axi_arvalid(m_axi_arvalid),  // output wire m_axi_arvalid
+    .m_axi_arready(m_axi_arready),  // input wire m_axi_arready
+    .m_axi_rid(m_axi_rid),          // input wire [3 : 0] m_axi_rid
+    .m_axi_rdata(m_axi_rdata),      // input wire [31 : 0] m_axi_rdata
+    .m_axi_rresp(m_axi_rresp),      // input wire [1 : 0] m_axi_rresp
+    .m_axi_rlast(m_axi_rlast),      // input wire m_axi_rlast
+    .m_axi_rvalid(m_axi_rvalid),    // input wire m_axi_rvalid
+    .m_axi_rready(m_axi_rready)     // output wire m_axi_rready
+  );
+
+                     
+    initial begin
+        $display("jtag_adapter test begin");
+        dramReadEnable = 0;
+        dramWriteEnable = 0;
+        m_axi_awready = 1;
+        m_axi_wready = 1;
+        m_axi_bvalid = 0;
+        m_axi_arready = 1;
+        m_axi_rvalid = 0;
+
+        clk = 0; #10; clk = 1; #10;
+        assert({m_axi_awvalid, m_axi_wvalid, m_axi_arvalid, m_axi_rready, dramValid} === 0) else $error("initial state is wrong");
+
+        // read request.
+        dramReadEnable = 1;
+        dramAddress = 12;
+        clk = 0; #10; clk = 1; #10;
+        assert(m_axi_arvalid === 1) else $error("read address valid not asserted");
+        assert(m_axi_rready === 1) else $error("read ready not asserted");
+        assert(m_axi_araddr === 12) else $error("read address is wrong");
+
+
+        assert({m_axi_awvalid, m_axi_wvalid, dramValid} === 0) else $error("read state is wrong");
+
+        // response.
+        m_axi_rid = 1;
+        m_axi_rdata = 1234;
+        m_axi_rvalid = 1;
+
+        clk = 0; #10; clk = 1; #10;
+        assert(dramValid) else $error("not finish reading");
+
+        $display("jtag_adapter test done");
+    end
+    
+endmodule
