@@ -1,4 +1,4 @@
-module jtag_adapter(input logic clk, 
+module jtag_adapter(input logic clk, reset,
     input logic [31:0] dramAddress, dramWriteData,
     input logic readEnable, writeEnable,
     output logic [31:0] dramReadData,
@@ -41,10 +41,61 @@ module jtag_adapter(input logic clk,
     input logic m_axi_rvalid,
     output logic m_axi_rready
     );
+
+    typedef enum logic [1:0] {DORMANT, READING, WRITING} statetype;
+    statetype state, nextstate;
+
+    // 0: awready
+    // 1: wready
+    // 2: bready
+    // 3: arready
+    // 4: rready
+    logic [4:0] completion;
+
+    always_ff @(posedge clk, posedge reset)
+        if(reset) begin
+             state <= DORMANT;
+             completion <= 5'b0;
+             dramReadData <= 32'b0;
+        end
+        else begin
+            state <= nextstate;
+            if(m_axi_rvalid)
+                dramReadData <= m_axi_rdata;
+
+            if(state == DORMANT)
+                completion <= 5'b0;
+            else
+                begin
+                    if(!completion[0])
+                        completion[0] <= m_axi_awready & m_axi_awvalid;
+                    if(!completion[1])
+                        completion[1] <= m_axi_wready & m_axi_wvalid;
+                    if(!completion[2])
+                        completion[2] <= m_axi_bready & m_axi_bvalid;
+                    if(!completion[3])
+                        completion[3] <= m_axi_arready & m_axi_arvalid;
+                    if(!completion[4])
+                        completion[4] <= m_axi_rready & m_axi_rvalid;
+                end
+        end
+
+    always_comb
+        case(state)
+            DORMANT: 
+                nextstate = writeEnable ? WRITING : (readEnable? READING: DORMANT);
+            READING:
+                nextstate = readEnable? READING: DORMANT;
+            WRITING:
+                nextstate = writeEnable? WRITING : DORMANT;
+        endcase
+
+
     assign m_axi_awid =  writeEnable? 4'b1 : 0;
     assign m_axi_awaddr = writeEnable ? dramAddress : 0;
 
-    assign m_axi_awlen = writeEnable ? 8'b1 : 0;
+    // assign m_axi_awlen = writeEnable ? 8'b1 : 0;
+    assign m_axi_awlen = 0; // burst size is awlen+1
     assign m_axi_awsize = writeEnable? 3'b10 : 0; // 4 byte.
     assign m_axi_awburst = 2'b00; // FIXED.
     assign m_axi_awlock = 0;
@@ -52,35 +103,38 @@ module jtag_adapter(input logic clk,
     assign m_axi_awprot = 3'b000; // Unprevileged, secure, data access.
     assign m_axi_awvalid = writeEnable;
 
-    assign dramValid = writeEnable ? 
-            (m_axi_awready & m_axi_wvalid & m_axi_bvalid) :
-             (m_axi_arready & m_axi_rvalid);
+    assign dramValid = (state == WRITING) ? (completion[2:0] == 3'b111) :
+         ((state == READING) ? (completion[4:3] == 2'b11) : 0);
+
+
     assign m_axi_wdata = writeEnable? dramWriteData : 0;
     assign m_axi_wstrb = writeEnable ? 4'b1111 : 0;
-    assign m_axi_wlast = writeEnable;
-    assign m_axi_wvalid = writeEnable;
+    assign m_axi_wlast = (state == WRITING);
+    assign m_axi_wvalid = (state == WRITING);
     /*
     input logic [3:0]m_axi_bid,
     input logic [1:0]m_axi_bresp,
     */
-    assign m_axi_bready = writeEnable;
+    // assign m_axi_bready = writeEnable;
+    assign m_axi_bready = completion[1];
 
     assign m_axi_arid = readEnable ? 4'b10 : 0;    
     assign m_axi_araddr = readEnable ? dramAddress : 0;
-    assign m_axi_arlen = readEnable ? 8'b1: 0;
+//    assign m_axi_arlen = readEnable ? 8'b1: 0;
+    assign m_axi_arlen = 0;
     assign m_axi_arsize = readEnable ? 3'b10: 0; // 4byte
     assign m_axi_arburst = 2'b00; // FIXED
     assign m_axi_arlock = 0;
     assign m_axi_arcache = 4'b0; // Non-bufferable.
     assign m_axi_arprot = 3'b000; // Unprevileged, secure, data access.
-    assign m_axi_arvalid = readEnable;
-    assign dramReadData = m_axi_rdata;
+    assign m_axi_arvalid = (state == READING);
+
     /*
     input logic [3:0]m_axi_rid,
     input logic [1:0]m_axi_rresp,
     input logic m_axi_rlast,
     */
-    assign m_axi_rready = readEnable;
+    assign m_axi_rready = (state == READING);
 
 endmodule
 

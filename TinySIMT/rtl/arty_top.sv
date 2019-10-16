@@ -881,6 +881,7 @@ module arty_top (
 
   jtag_adapter u_jtag_adapter (
     .clk(ui_clk),                     // input wire aclk
+    .reset(!ui_rstn),
     .dramAddress(dramAddress), .dramWriteData(dramWriteData),
     .readEnable(dramReadEnable), .writeEnable(dramWriteEnable),
     .dramReadData(dramReadData),

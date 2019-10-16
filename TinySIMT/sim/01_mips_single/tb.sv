@@ -486,7 +486,7 @@ endmodule
 
 module testbench_jtag_adapter(
     );
-    logic clk;
+    logic clk, reset;
 
     logic [31:0] dramAddress, dramReadData, dramWriteData;
     logic dramWriteEnable, dramReadEnable, dramValid;
@@ -531,6 +531,7 @@ module testbench_jtag_adapter(
 
   jtag_adapter dut (
     .clk(clk),                     // input wire aclk
+    .reset(reset),
     .dramAddress(dramAddress), .dramWriteData(dramWriteData),
     .readEnable(dramReadEnable), .writeEnable(dramWriteEnable),
     .dramReadData(dramReadData),
@@ -578,6 +579,16 @@ module testbench_jtag_adapter(
         $display("jtag_adapter test begin");
         dramReadEnable = 0;
         dramWriteEnable = 0;
+        m_axi_awready = 0;
+        m_axi_wready = 0;
+        m_axi_bvalid = 0;
+        m_axi_arready = 0;
+        m_axi_rvalid = 0;
+
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+
+
         m_axi_awready = 1;
         m_axi_wready = 1;
         m_axi_bvalid = 0;
@@ -594,17 +605,25 @@ module testbench_jtag_adapter(
         assert(m_axi_arvalid === 1) else $error("read address valid not asserted");
         assert(m_axi_rready === 1) else $error("read ready not asserted");
         assert(m_axi_araddr === 12) else $error("read address is wrong");
-
-
         assert({m_axi_awvalid, m_axi_wvalid, dramValid} === 0) else $error("read state is wrong");
 
-        // response.
+        
+        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(m_axi_arvalid === 1) else $error("read address valid not asserted");
+        assert(m_axi_rready === 1) else $error("read ready not asserted");
+        assert(m_axi_araddr === 12) else $error("read address is wrong");
+        assert({m_axi_awvalid, m_axi_wvalid, dramValid} === 0) else $error("read state is wrong");
+
+        // ar accepted. next rready turn on.
+        m_axi_arready = 0;
         m_axi_rid = 1;
         m_axi_rdata = 1234;
         m_axi_rvalid = 1;
 
-        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
         assert(dramValid) else $error("not finish reading");
+
+
 
         $display("jtag_adapter test done");
     end
