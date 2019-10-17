@@ -42,7 +42,7 @@ module jtag_adapter(input logic clk, reset,
     output logic m_axi_rready
     );
 
-    typedef enum logic [1:0] {DORMANT, READING, WRITING} statetype;
+    typedef enum logic [3:0] {DORMANT, READ_ARSEND, READ_VALUE,READ_DONE,  WRITE_AWSEND, WRITE_DATA, WRITE_RESPONSE, WRITE_DONE} statetype;
     statetype state, nextstate;
 
     // 0: awready
@@ -63,31 +63,28 @@ module jtag_adapter(input logic clk, reset,
             if(m_axi_rvalid)
                 dramReadData <= m_axi_rdata;
 
-            if(state == DORMANT)
-                completion <= 5'b0;
-            else
-                begin
-                    if(!completion[0])
-                        completion[0] <= m_axi_awready & m_axi_awvalid;
-                    if(!completion[1])
-                        completion[1] <= m_axi_wready & m_axi_wvalid;
-                    if(!completion[2])
-                        completion[2] <= m_axi_bready & m_axi_bvalid;
-                    if(!completion[3])
-                        completion[3] <= m_axi_arready & m_axi_arvalid;
-                    if(!completion[4])
-                        completion[4] <= m_axi_rready & m_axi_rvalid;
-                end
         end
 
     always_comb
         case(state)
             DORMANT: 
-                nextstate = writeEnable ? WRITING : (readEnable? READING: DORMANT);
-            READING:
-                nextstate = readEnable? READING: DORMANT;
-            WRITING:
-                nextstate = writeEnable? WRITING : DORMANT;
+                nextstate = writeEnable ? WRITE_AWSEND : (readEnable? READ_ARSEND: DORMANT);
+            READ_ARSEND:
+                nextstate = (m_axi_arready & m_axi_arvalid) ? READ_VALUE: READ_ARSEND;
+            READ_VALUE:
+                nextstate = (m_axi_rready & m_axi_rvalid) ? READ_DONE : READ_VALUE; 
+            READ_DONE:
+                nextstate = DORMANT;
+            WRITE_AWSEND:
+                nextstate = (m_axi_awready & m_axi_awvalid) ? WRITE_DATA : WRITE_AWSEND;
+            WRITE_DATA:
+                nextstate = (m_axi_wready & m_axi_wvalid) ? WRITE_RESPONSE : WRITE_DATA;
+            WRITE_RESPONSE:
+                nextstate = (m_axi_bready & m_axi_bvalid) ? WRITE_DONE : WRITE_RESPONSE;
+            WRITE_DONE:
+                nextstate = DORMANT;
+            default:
+                nextstate = DORMANT;
         endcase
 
 
@@ -101,22 +98,20 @@ module jtag_adapter(input logic clk, reset,
     assign m_axi_awlock = 0;
     assign m_axi_awcache = 4'b0; // Non-bufferable.
     assign m_axi_awprot = 3'b000; // Unprevileged, secure, data access.
-    assign m_axi_awvalid = writeEnable;
+    assign m_axi_awvalid = (state==WRITE_AWSEND);
 
-    assign dramValid = (state == WRITING) ? (completion[2:0] == 3'b111) :
-         ((state == READING) ? (completion[4:3] == 2'b11) : 0);
-
+    assign dramValid = (state == WRITE_DONE) | (state == READ_DONE);
 
     assign m_axi_wdata = writeEnable? dramWriteData : 0;
     assign m_axi_wstrb = writeEnable ? 4'b1111 : 0;
-    assign m_axi_wlast = (state == WRITING);
-    assign m_axi_wvalid = (state == WRITING);
+    assign m_axi_wlast = writeEnable;
+    assign m_axi_wvalid = (state == WRITE_DATA);
     /*
     input logic [3:0]m_axi_bid,
     input logic [1:0]m_axi_bresp,
     */
     // assign m_axi_bready = writeEnable;
-    assign m_axi_bready = completion[1];
+    assign m_axi_bready = (state==WRITE_RESPONSE);
 
     assign m_axi_arid = readEnable ? 4'b10 : 0;    
     assign m_axi_araddr = readEnable ? dramAddress : 0;
@@ -127,14 +122,14 @@ module jtag_adapter(input logic clk, reset,
     assign m_axi_arlock = 0;
     assign m_axi_arcache = 4'b0; // Non-bufferable.
     assign m_axi_arprot = 3'b000; // Unprevileged, secure, data access.
-    assign m_axi_arvalid = (state == READING);
+    assign m_axi_arvalid = (state == READ_ARSEND);
 
     /*
     input logic [3:0]m_axi_rid,
     input logic [1:0]m_axi_rresp,
     input logic m_axi_rlast,
     */
-    assign m_axi_rready = (state == READING);
+    assign m_axi_rready = (state == READ_VALUE);
 
 endmodule
 

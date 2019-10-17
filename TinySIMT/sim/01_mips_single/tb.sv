@@ -603,29 +603,84 @@ module testbench_jtag_adapter(
         dramAddress = 12;
         clk = 0; #10; clk = 1; #10;
         assert(m_axi_arvalid === 1) else $error("read address valid not asserted");
-        assert(m_axi_rready === 1) else $error("read ready not asserted");
+        assert(m_axi_rready === 0) else $error("read ready is asserted");
         assert(m_axi_araddr === 12) else $error("read address is wrong");
         assert({m_axi_awvalid, m_axi_wvalid, dramValid} === 0) else $error("read state is wrong");
 
-        
-        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
-        assert(m_axi_arvalid === 1) else $error("read address valid not asserted");
-        assert(m_axi_rready === 1) else $error("read ready not asserted");
-        assert(m_axi_araddr === 12) else $error("read address is wrong");
-        assert({m_axi_awvalid, m_axi_wvalid, dramValid} === 0) else $error("read state is wrong");
+        // finish ar handshake, wait data.
+        clk = 0; #10; clk = 1; #10;
+        assert(m_axi_arvalid === 0) else $error("read address valid assert twice wrongly");
+        assert(m_axi_rready === 1) else $error("read ready is asserted");
 
-        // ar accepted. next rready turn on.
-        m_axi_arready = 0;
+
+        // data comming.
         m_axi_rid = 1;
         m_axi_rdata = 1234;
         m_axi_rvalid = 1;
+        clk = 0; #10; clk = 1; #10;
+        assert(m_axi_rready === 0) else $error("read ready is asserted twice after rvalid, wrong.");
 
-        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramReadData === 1234) else $error("read data is wrong");
         assert(dramValid) else $error("not finish reading");
-
-
+        clk = 0; #10; clk = 1; #10;
+        assert(dut.state === 0) else $error("fail to back to DORMANT. %b", dut.state);
+        clk = 0; #10; clk = 1; #10;
 
         $display("jtag_adapter test done");
     end
     
 endmodule
+
+
+module testbench_fifo(
+    );
+    logic clk, rstn, we, re, full, empty;
+    logic[0:1] wdata, rdata;
+
+
+    cmn_fifo #(.DW(2), .AW(1))
+    dut(
+    .clk      (clk),
+    .rstn     (rstn),
+    .we       (we),
+    .wdata    (wdata),
+    .re       (re),
+    .rdata    (rdata),
+    .full     (full),
+    .empty    (empty)
+    );
+
+                     
+    initial begin
+        we = 0;
+        re = 0;
+        rstn = 0;
+        #10ns;
+        rstn = 1;
+
+        clk = 0; #10; clk = 1; #10;
+        assert(!full & empty) else $error("init state wrong");
+
+        wdata = 2'b11;
+        we = 1;
+        clk=0; #10; clk=1; #10;
+     
+        // this line is fail because AW=1 means 2 depth fifo.
+        // assert(full) else $error("not full after write");
+        assert(!empty) else $error("empty after write");
+        assert(rdata === 2'b11) else $error("top value is different");
+
+        we = 0;
+        clk=0; #10; clk=1; #10;
+        assert(rdata === 2'b11) else $error("top value is different after we deasserted");
+        
+        re = 1;
+        clk=0; #10; clk=1; #10;
+        assert(empty && !full) else $error("state error after read");
+
+        $display("end fifo normal test");
+
+    end
+endmodule
+
+

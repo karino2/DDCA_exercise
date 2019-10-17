@@ -63,13 +63,8 @@ module tb;
    initial begin
       forever
         #5ns clk = ~clk; // 100MHz
-        /*
-        if(u_ddr_io.init_calib_complete !== 1)
-            begin
-        #5ns clk = ~clk; // 100MHz
-            end
-        */
    end
+
 
    initial begin
       rstn = 0;
@@ -92,60 +87,64 @@ module tb;
       dramReadEnable = 1;
 
       wait(m_axi_arready);
-      #50ns;
-
-      $display("arready asserted, %b, %b", u_jtag_adapter.completion, u_jtag_adapter.state);
+      /*
+      $display("arready asserted, %b", u_jtag_adapter.state);
       $display("%h, %h, %h, %h, %h", m_axi_arvalid, m_axi_arready, m_axi_rready, m_axi_rvalid, m_axi_rresp);
+      */
       wait(m_axi_rvalid);
-      $display("rdata=%h", m_axi_rdata);
-      #50ns;
-      $display("rvalid asserted, %b, %h", u_jtag_adapter.completion, m_axi_rdata);
+      /*
+      $display("rdata=%h, %h, %h, %h", m_axi_rdata, u_ddr_io.s_axi_rdata, ddr3_dq, m_axi_araddr);
+      $display("rvalid asserted, %h", m_axi_rdata);
+      $display("w_rsel=%b, full=%b, empty=%b, rvalid=%b, rready=%b, arvalid=%b, arready=%b", u_ddr_io.w_rsel, u_ddr_io.arf_full, u_ddr_io.arf_empty, u_ddr_io.m_axi_rvalid, u_ddr_io.m_axi_rready, u_ddr_io.m_axi_arvalid, u_ddr_io.m_axi_arready);
+      $display("r_rp=%b, r_wp=%b, mem[0]=%h, mem[1]=%h", u_ddr_io.u_arfifo.r_rp, u_ddr_io.u_arfifo.r_wp, u_ddr_io.u_arfifo.u_mem.r_mem[0], u_ddr_io.u_arfifo.u_mem.r_mem[1]);
       $display("%h, %h, %h, %h, %h, %h", m_axi_awready, m_axi_wready, m_axi_bid, m_axi_bvalid, m_axi_arready, m_axi_rvalid);
-      $display("%h, %h, %h, %b", dramReadData, m_axi_rdata, m_axi_rid,  u_jtag_adapter.completion);
+      $display("dramReadData=%h, m_axi_rdata=%h, %h", dramReadData, m_axi_rdata, m_axi_rid);
       $display("rid=%b, rresp=%b, rlast=%b", m_axi_rid, m_axi_rresp, m_axi_rlast);
-      assert(dramValid) else $error("Read not finished, %b, %d", u_jtag_adapter.completion, u_jtag_adapter.state);
-      $display("read done");
+      */
+      wait(dramValid);
 
+      assert(dramValid) else $error("Read not finished, %b", u_jtag_adapter.state);
       dramReadEnable = 0;
       #50ns;
 
-
+      $display("first read done. dramReadData=%h", dramReadData);
 
       dramWriteEnable = 1;
       dramWriteData = 1234;
-      $display("write1");
       wait(m_axi_awready);
-      $display("write2");
       wait(m_axi_wready);
-      $display("write3");
-      #50ns;
-      $display("%b, %b, %b, %b, %b", m_axi_bready, m_axi_bid, u_jtag_adapter.completion, m_axi_wlast, m_axi_awlen);
       wait(m_axi_bvalid);
-      $display("write4");
-      #50ns;
-      assert(dramValid) else $error("Write not finished, %b, %d", u_jtag_adapter.completion, u_jtag_adapter.state);
-      $display("write done. second read start.");
+      wait(dramValid);
+      assert(dramValid) else $error("Write not finished, %d", u_jtag_adapter.state);
+      $display("write done.");
 
       dramWriteEnable = 0;
       #50ns;
-
-
-
-      $display("after write, now dormant. %h, %h, %h, %h, %h, %h", m_axi_awready, m_axi_wready, m_axi_bid, m_axi_bvalid, m_axi_arready, m_axi_rvalid);
+      // $display("after write, now dormant. %h, %h, %h, %h, %h, %h", m_axi_awready, m_axi_wready, m_axi_bid, m_axi_bvalid, m_axi_arready, m_axi_rvalid);
 
       assert(u_jtag_adapter.state === 0) else $error("not dormant after write");
 
-      $display("arready =%h, arvalid = %h", m_axi_arready, m_axi_arvalid);
+
+      // $display("second ready start. arready =%h, arvalid = %h, rready=%h", m_axi_arready, m_axi_arvalid, m_axi_rready);
       assert(!dramValid) else $error("dramValid assert wrongly");
 
       dramReadEnable = 1;
-      wait(m_axi_arready);
+      wait(m_axi_arready & m_axi_arvalid);
       wait(m_axi_rvalid);
-      $display("rdata=%h", m_axi_rdata);
-      #50ns;
-      $display("second read: %h, %h, %h, %b", dramReadData, m_axi_rdata, m_axi_rid,  u_jtag_adapter.completion);
-      assert(dramValid) else $error("Read2 not finished, %b, %d", u_jtag_adapter.completion, u_jtag_adapter.state);
+      /*
+      $display("rdata=%h, %h, %h, %h", m_axi_rdata, u_ddr_io.s_axi_rdata, ddr3_dq, m_axi_araddr);
+      $display("w_rsel=%b, full=%b, empty=%b, rvalid=%b, rready=%b, arvalid=%b, arready=%b", u_ddr_io.w_rsel, u_ddr_io.arf_full, u_ddr_io.arf_empty, u_ddr_io.m_axi_rvalid, u_ddr_io.m_axi_rready, u_ddr_io.m_axi_arvalid, u_ddr_io.m_axi_arready);
+      $display("r_rp=%b, r_wp=%b, mem[0]=%h, mem[1]=%h", u_ddr_io.u_arfifo.r_rp, u_ddr_io.u_arfifo.r_wp, u_ddr_io.u_arfifo.u_mem.r_mem[0], u_ddr_io.u_arfifo.u_mem.r_mem[1]);
+      $display("second read: %h, %h, %h, %h", dramReadData, m_axi_rdata, m_axi_rid,  u_ddr_io.s_axi_rdata);
+      $display("w_rsel=%b, full=%b, empty=%b, rvalid=%b, rready=%b, arvalid=%b, arready=%b", u_ddr_io.w_rsel, u_ddr_io.arf_full, u_ddr_io.arf_empty, u_ddr_io.m_axi_rvalid, u_ddr_io.m_axi_rready, u_ddr_io.m_axi_arvalid, u_ddr_io.m_axi_arready);
+      $display("r_rp=%b, r_wp=%b, mem[0]=%h, mem[1]=%h", u_ddr_io.u_arfifo.r_rp, u_ddr_io.u_arfifo.r_wp, u_ddr_io.u_arfifo.u_mem.r_mem[0], u_ddr_io.u_arfifo.u_mem.r_mem[1]);
+      */
+      wait(dramValid);
+      assert(dramValid) else $error("Read2 not finished, %d", u_jtag_adapter.state);
+      assert(dramReadData === 1234) else $error("written data is not read: %h", dramReadData);
+      $display("second read2: dramReadData=%h", dramReadData);
 
+      dramReadEnable = 0;
 
       #1us;
       $stop(0);
