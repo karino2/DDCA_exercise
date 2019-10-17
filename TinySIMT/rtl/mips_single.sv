@@ -106,8 +106,10 @@ module mips_single #(parameter FILENAME="romdata.mem")
             if(Halt)
                 halted <= 1;
 
+    /*
     always @(posedge clk)
         $display("instr %h, pc %h, opcode=%b, dmaCmd=%b, stall %b", instr, pc, instr[31:26], dmaCmd, stall);
+        */
 
     /*
     logic [31:0] sramReadData, memAddress, sramWriteData;

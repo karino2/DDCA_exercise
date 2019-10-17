@@ -784,7 +784,7 @@ module arty_top (
 
   // TODO: use sys_clk and cross domain to dma_ctrl.
     mips_single_sram_dmac_led #("d2s_test.mem")
-      u_mips_sram_dmac_led(ui_clk, !ui_rstn, 
+      u_mips_sram_dmac_led(ui_clk, !ui_rstn | btn[1], 
         halt,
         led[2:0],
         dramAddress, dramWriteData,

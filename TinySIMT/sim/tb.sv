@@ -32,7 +32,7 @@ module tb;
 
       wait(dut.init_calib_complete);
       $display("Calibration Done");
-
+      
       #1us;
       $stop(0);
    end
@@ -57,6 +57,7 @@ module tb;
      .ddr3_odt     (ddr3_odt),
      .sys_clk      (clk),
      .sys_rstn     (rstn),
+     .btn (btn),
      .led          (led)
    );
 

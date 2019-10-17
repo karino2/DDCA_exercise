@@ -42,7 +42,7 @@ module jtag_adapter(input logic clk, reset,
     output logic m_axi_rready
     );
 
-    typedef enum logic [3:0] {DORMANT, READ_ARSEND, READ_VALUE,READ_DONE,  WRITE_AWSEND, WRITE_DATA, WRITE_RESPONSE, WRITE_DONE} statetype;
+    typedef enum logic [3:0] {DORMANT, READ_ARSEND, READ_VALUE, READ_DONE,  WRITE_AWSEND, WRITE_DATA, WRITE_RESPONSE, WRITE_DONE} statetype;
     statetype state, nextstate;
 
     // 0: awready

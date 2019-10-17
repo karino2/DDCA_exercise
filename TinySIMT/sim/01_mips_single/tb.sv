@@ -353,6 +353,7 @@ module testbench_d2stest_check_led(
         // $display("sramAddr=%h", sramAddressForDMAC);
         clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
         clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramAddress === 28);
 
         dramReadData = 456;
         dramValid = 1;
@@ -360,6 +361,7 @@ module testbench_d2stest_check_led(
         dramValid = 0;
         clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
         clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramAddress === 32);
 
         dramReadData = 789;
         dramValid = 1;
@@ -368,6 +370,7 @@ module testbench_d2stest_check_led(
         clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
         clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
 
+        assert(dramAddress === 36);
         dramReadData = 5555;
         dramValid = 1;
         clk = 0; #10; clk = 1; #10; 
@@ -683,4 +686,223 @@ module testbench_fifo(
     end
 endmodule
 
+module testbench_d2stest_check_led_mock_ddr(
+    );
+    logic clk, reset;
+
+    logic halt;
+    logic [2:0] ledval; 
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+    logic [3:0]m_axi_awid;
+    logic [31:0]m_axi_awaddr;
+    logic [7:0]m_axi_awlen;
+    logic [2:0]m_axi_awsize;
+    logic [1:0]m_axi_awburst;
+    logic m_axi_awlock;
+    logic [3:0]m_axi_awcache;
+    logic [2:0]m_axi_awprot;
+    logic m_axi_awvalid;
+    logic m_axi_awready;
+    logic [31:0]m_axi_wdata;
+    logic [3:0]m_axi_wstrb;
+    logic m_axi_wlast;
+    logic m_axi_wvalid;
+    logic m_axi_wready;
+    logic [3:0]m_axi_bid;
+    logic [1:0]m_axi_bresp;
+    logic m_axi_bvalid;
+    logic m_axi_bready;
+    logic [3:0]m_axi_arid;
+    logic [31:0]m_axi_araddr;
+    logic [7:0]m_axi_arlen;
+    logic [2:0]m_axi_arsize;
+    logic [1:0]m_axi_arburst;
+    logic m_axi_arlock;
+    logic [3:0]m_axi_arcache;
+    logic [2:0]m_axi_arprot;
+    logic [3:0]m_axi_arqos;
+    logic m_axi_arvalid;
+    logic m_axi_arready;
+    logic [3:0]m_axi_rid;
+    logic [31:0]m_axi_rdata;
+    logic [1:0]m_axi_rresp;
+    logic m_axi_rlast;
+    logic m_axi_rvalid;
+    logic m_axi_rready;
+
+    /*
+    // assume in DDR,
+    // 24: 123
+    // 28: 456
+    // 32: 789
+    // 34: 5555
+
+    led map
+    0x8000_0000: led[0]
+    0x8000_0004: led[1]
+    0x8000_0008: led[2]
+*/
+    mips_single_sram_dmac_led #("d2s_test.mem")
+      dut(clk, reset, 
+        halt,
+        ledval,
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+  jtag_adapter u_jtag_adapter (
+    .clk(clk),                     // input wire aclk
+    .reset(reset),
+    .dramAddress(dramAddress), .dramWriteData(dramWriteData),
+    .readEnable(dramReadEnable), .writeEnable(dramWriteEnable),
+    .dramReadData(dramReadData),
+    .dramValid(dramValid),
+
+    .m_axi_awid(m_axi_awid),        // output wire [3 : 0] m_axi_awid
+    .m_axi_awaddr(m_axi_awaddr),    // output wire [31 : 0] m_axi_awaddr
+    .m_axi_awlen(m_axi_awlen),      // output wire [7 : 0] m_axi_awlen
+    .m_axi_awsize(m_axi_awsize),    // output wire [2 : 0] m_axi_awsize
+    .m_axi_awburst(m_axi_awburst),  // output wire [1 : 0] m_axi_awburst
+    .m_axi_awlock(m_axi_awlock),    // output wire m_axi_awlock
+    .m_axi_awcache(m_axi_awcache),  // output wire [3 : 0] m_axi_awcache
+    .m_axi_awprot(m_axi_awprot),    // output wire [2 : 0] m_axi_awprot
+    .m_axi_awvalid(m_axi_awvalid),  // output wire m_axi_awvalid
+    .m_axi_awready(m_axi_awready),  // input wire m_axi_awready
+    .m_axi_wdata(m_axi_wdata),      // output wire [31 : 0] m_axi_wdata
+    .m_axi_wstrb(m_axi_wstrb),      // output wire [3 : 0] m_axi_wstrb
+    .m_axi_wlast(m_axi_wlast),      // output wire m_axi_wlast
+    .m_axi_wvalid(m_axi_wvalid),    // output wire m_axi_wvalid
+    .m_axi_wready(m_axi_wready),    // input wire m_axi_wready
+    .m_axi_bid(m_axi_bid),          // input wire [3 : 0] m_axi_bid
+    .m_axi_bresp(m_axi_bresp),      // input wire [1 : 0] m_axi_bresp
+    .m_axi_bvalid(m_axi_bvalid),    // input wire m_axi_bvalid
+    .m_axi_bready(m_axi_bready),    // output wire m_axi_bready
+    .m_axi_arid(m_axi_arid),        // output wire [3 : 0] m_axi_arid
+    .m_axi_araddr(m_axi_araddr),    // output wire [31 : 0] m_axi_araddr
+    .m_axi_arlen(m_axi_arlen),      // output wire [7 : 0] m_axi_arlen
+    .m_axi_arsize(m_axi_arsize),    // output wire [2 : 0] m_axi_arsize
+    .m_axi_arburst(m_axi_arburst),  // output wire [1 : 0] m_axi_arburst
+    .m_axi_arlock(m_axi_arlock),    // output wire m_axi_arlock
+    .m_axi_arcache(m_axi_arcache),  // output wire [3 : 0] m_axi_arcache
+    .m_axi_arprot(m_axi_arprot),    // output wire [2 : 0] m_axi_arprot
+    .m_axi_arvalid(m_axi_arvalid),  // output wire m_axi_arvalid
+    .m_axi_arready(m_axi_arready),  // input wire m_axi_arready
+    .m_axi_rid(m_axi_rid),          // input wire [3 : 0] m_axi_rid
+    .m_axi_rdata(m_axi_rdata),      // input wire [31 : 0] m_axi_rdata
+    .m_axi_rresp(m_axi_rresp),      // input wire [1 : 0] m_axi_rresp
+    .m_axi_rlast(m_axi_rlast),      // input wire m_axi_rlast
+    .m_axi_rvalid(m_axi_rvalid),    // input wire m_axi_rvalid
+    .m_axi_rready(m_axi_rready)     // output wire m_axi_rready
+  );
+
+
+
+    initial begin
+        {m_axi_awready, m_axi_wready, m_axi_bid, m_axi_bresp,
+        m_axi_bvalid, m_axi_arready, m_axi_rid, m_axi_rdata, m_axi_rresp, m_axi_rvalid, m_axi_rlast} = 0;
+
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10;
+        clk = 1; #10; 
+        // $display("deb1, %h", dmaDstAddress);
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramReadEnable) else $error("DRAM read not invoked.");
+        assert(dramAddress === 24) else $error("DRAM read address is wrong. %h", dramAddress);
+        assert(m_axi_araddr === 24) else $error("araddr is wrong. %h", m_axi_araddr);
+
+
+        m_axi_arready = 1;
+        clk = 0; #10; clk = 1;
+        assert(m_axi_arready & m_axi_arvalid) else $error("arvalid is not asserted");
+        #10; clk = 0; #10; clk = 1;
+        assert(!(m_axi_arready & m_axi_rvalid)) else $error("ar handshake occure twice");
+        #10; clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        m_axi_arready = 0;
+
+        assert(m_axi_rready) else $error("not go to read handshake, rready is deasserted %b", m_axi_rready);
+        // $display("jtag_adapter.state=%b", u_jtag_adapter.state);
+
+        m_axi_rdata = 123;
+        m_axi_rlast = 1;
+        m_axi_rvalid = 1;
+        clk = 0; #10; clk = 1; 
+        // $display("jtag_adapter.state=%b", u_jtag_adapter.state);
+        assert(m_axi_rready & m_axi_rvalid) else $error("read handshake fail, %b, %b", m_axi_rready, m_axi_rvalid);
+        #10; clk = 0; #10; clk = 1;
+        assert(!(m_axi_rready & m_axi_rvalid)) else $error("read handshake occure twice. master side should de-assert");
+        assert(dramValid) else $error("dramValid not asserted");
+
+        m_axi_rvalid = 0;
+        // $display("jtag_adapter.state=%b", u_jtag_adapter.state);
+        // assert(dramValid);
+        // $display("dramValid1=%b", dramValid);
+        #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+
+
+        assert(m_axi_araddr === 28) else $error("araddr is wrong. %h", m_axi_araddr);
+        m_axi_arready = 1;
+        clk = 0; #10; clk = 1;#10;
+        m_axi_arready = 0;
+        #10; clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        m_axi_rdata = 456;
+        m_axi_rlast = 1;
+        m_axi_rvalid = 1;
+        clk = 0; #10; clk = 1; #10;
+        m_axi_rvalid = 0;
+
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        assert(m_axi_araddr === 32) else $error("araddr is wrong. %h", m_axi_araddr);
+        m_axi_arready = 1;
+        clk = 0; #10; clk = 1;#10;
+        m_axi_arready = 0;
+        #10; clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        m_axi_rdata = 789;
+        m_axi_rlast = 1;
+        m_axi_rvalid = 1;
+        clk = 0; #10; clk = 1; #10;
+        m_axi_rvalid = 0;
+
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        assert(m_axi_araddr === 36) else $error("araddr is wrong. %h", m_axi_araddr);
+        m_axi_arready = 1;
+        clk = 0; #10; clk = 1;#10;
+        m_axi_arready = 0;
+        #10; clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        m_axi_rdata = 5555;
+        m_axi_rlast = 1;
+        m_axi_rvalid = 1;
+        clk = 0; #10; clk = 1; #10;
+        m_axi_rvalid = 0;
+
+        repeat(60)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(ledval === 3'b111) else $error("ledval wrong, %b", ledval);
+        assert(halt) else $error("not halted %b", halt);
+        $display("end testbench_d2stest_check_led_mock_ddr");
+    end
+    
+endmodule
 
