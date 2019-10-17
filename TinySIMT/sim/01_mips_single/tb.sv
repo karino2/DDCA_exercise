@@ -28,6 +28,37 @@ module testbench_mipstest_add(
     
 endmodule
 
+
+module testbench_mipstest_reset(
+    );
+    logic clk, reset;
+
+    logic [31:0] sramReadData, sramAddress, sramWriteData, dmaSrcAddress, dmaDstAddress;
+    logic sramWriteEnable, halt;
+    logic [1:0] dmaCmd;
+    logic [9:0] dmaWidth;    
+    sram DataMem(clk, sramAddress[15:2], sramWriteEnable, sramWriteData, sramReadData);
+
+    mips_single #("halt_test.mem") dut(clk, reset, 1'b0, sramReadData, sramAddress, sramWriteData, sramWriteEnable,
+                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
+                     
+    initial begin
+        $display("reset test begin");
+        clk = 0; reset = 1; #10; reset = 0; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        assert(halt) else $error("not halted");
+
+        $display("pc=%h", dut.pc);
+        clk = 0; reset = 1; #10; clk=1; #10;
+        clk = 0; reset = 0; #10; 
+        clk = 1; #10;
+        $display("pc=%h", dut.pc);
+        $display("reset test end");
+    end
+endmodule
+
+
+
 module testbench_luiori(
     );
     logic clk, reset;
@@ -122,7 +153,7 @@ module testbench_dmac_d2s(
     logic [31:0] sramReadData, sramWriteData,  dmaSrcAddress, dmaDstAddress,
                 dramAddress, dramReadData, dramWriteData;
     logic [13:0] sramAddress;
-    logic sramWriteEnable, dramWriteEnable, dramReadEnable, dramValid, halt, stall;
+    logic sramWriteEnable, dramWriteEnable, dramReadEnable, dramValid, stall;
     logic [1:0] dmaCmd;
     logic [9:0] dmaWidth;    
     sram DataMem(clk, sramAddress, sramWriteEnable, sramWriteData, sramReadData);

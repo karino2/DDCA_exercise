@@ -505,7 +505,7 @@ module mux_axi(input logic control,
 
 endmodule
 
-module arty_top (
+module arty_top #(parameter FILENAME="d2s_test.mem")  (
   inout [15:0]  ddr3_dq,
   inout [1:0]   ddr3_dqs_n,
   inout [1:0]   ddr3_dqs_p,
@@ -783,7 +783,7 @@ module arty_top (
     logic [31:0] dramAddress, dramWriteData, dramReadData;
 
   // TODO: use sys_clk and cross domain to dma_ctrl.
-    mips_single_sram_dmac_led #("d2s_test.mem")
+    mips_single_sram_dmac_led #(FILENAME)
       u_mips_sram_dmac_led(ui_clk, !ui_rstn | btn[1], 
         halt,
         led[2:0],
