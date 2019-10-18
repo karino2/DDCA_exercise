@@ -610,6 +610,98 @@ module testbench_d2s_simple(
     
 endmodule
 
+
+module testbench_s2d_cpuonly(
+    );
+    logic clk, reset;
+
+    logic halt;
+    logic [2:0] ledval; 
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+    /*
+    // copy data to DDR,
+    // 0018: 123
+    // 001C: 456
+    // 0020: 789
+    // 0024: 5555
+
+*/
+    mips_single_sram_dmac_led #("s2d_test.mem")
+      dut(clk, reset, 
+        halt,
+        ledval,
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+    initial begin
+        dramValid = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramWriteEnable) else $error("DRAM write not invoked.");
+        assert(dramAddress === 32'h18) else $error("DRAM write address is wrong. %h", dramAddress);
+        assert(dramWriteData === 123) else $error("write data is wrong %h", dramWriteData);
+
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramWriteEnable) else $error("DRAM write2 not invoked.");
+        assert(dramAddress === 32'h1C) else $error("DRAM write2 address is wrong. %h", dramAddress);
+        assert(dramWriteData === 456) else $error("write2 data is wrong %h", dramWriteData);
+
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramWriteEnable) else $error("DRAM write3 not invoked.");
+        assert(dramAddress === 32'h20) else $error("DRAM write3 address is wrong. %h", dramAddress);
+        assert(dramWriteData === 789) else $error("write3 data is wrong %h", dramWriteData);
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+        assert(dramWriteEnable) else $error("DRAM write4 not invoked.");
+        assert(dramAddress === 32'h24) else $error("DRAM write4 address is wrong. %h", dramAddress);
+        assert(dramWriteData === 5555) else $error("write4 data is wrong %h", dramWriteData);
+
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+                repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(halt) else $error("not halted %b", halt);
+        $display("s2d test done");
+    end
+    
+endmodule
+
+
 /* only first data is valid case. */
 module testbench_d2s_simple_fail2(
     );

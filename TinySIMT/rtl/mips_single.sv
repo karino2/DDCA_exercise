@@ -45,7 +45,7 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
             ALUCtrl = 3'b110;
         else if(Opcode == 6'b001101) // ori
             ALUCtrl = 3'b001;
-        else
+        else if(Opcode == 6'b0)
             case(Funct)
                 6'd34: ALUCtrl = 3'b110;
                  6'b100100: ALUCtrl = 3'b000;
@@ -53,6 +53,8 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
                  6'b101010: ALUCtrl = 3'b111;
                  default: ALUCtrl = 3'b010;
             endcase
+        else
+            ALUCtrl = 3'b010; // lw, sw, etc.
 
     always_comb
         case(Opcode)
@@ -110,12 +112,7 @@ module mips_single #(parameter FILENAME="romdata.mem")
     logic [4:0] regAddr1, regAddr2, regWriteAddr;
     logic regWriteEnable;
     logic [31:0] regReadData1, regReadData2, regWriteData;
-    
-    /*
-    always @(posedge clk)
-        $display("instr %h, pc %h, opcode=%b, dmaCmd=%b, stall %b, %h, %h", instr, pc, instr[31:26], dmaCmd, stall, regReadData1, regReadData2);
-        */
-    
+
     regfile_single RegFile(clk, regAddr1, regAddr2, regWriteAddr, regWriteEnable, regWriteData, regReadData1, regReadData2);
 
     logic RegWrite, RegDst, ALUSrc, Branch, IsZeroImm; 
@@ -136,6 +133,12 @@ module mips_single #(parameter FILENAME="romdata.mem")
     assign immExtend = IsZeroImm ? zeroImm : signImm;
     
     logic cout, zero;
+    
+    /*
+    always @(posedge clk)
+        $display("instr %h, pc %h, opcode=%b, dmaCmd=%b, stall %b, regd1 %h, regd2 %h, alures=%h, srcB=%h, aluctrl=%b", instr, pc, instr[31:26], dmaCmd, stall, regReadData1, regReadData2, alures, srcB, ALUCtrl);
+        */
+    
     
     mux2 MuxSrcB(regReadData2, immExtend, ALUSrc, srcB); 
     
@@ -230,8 +233,11 @@ module mips_single_sram_dmac_led #(parameter FILENAME="romdata.mem")
         sramWriteEnable = sramWriteEnableForDMAC;
         sramWriteData = sramWriteDataForDMAC;
         sramReadDataForDMAC = sramReadData;
+        sramReadDataForCPU = 32'b0;        
       end
     else
+      begin
+        sramReadDataForDMAC = 32'b0;
         if(sramAddressForCPU[31])
             begin
                 sramAddress = 14'b0;
@@ -246,5 +252,6 @@ module mips_single_sram_dmac_led #(parameter FILENAME="romdata.mem")
                 sramWriteData = sramWriteDataForCPU;
                 sramReadDataForCPU = sramReadData;        
             end
+      end
 
 endmodule

@@ -31,7 +31,6 @@ module jtag_adapter(input logic clk, reset,
     output logic m_axi_arlock,
     output logic [3:0]m_axi_arcache,
     output logic [2:0]m_axi_arprot,
-    output logic [3:0]m_axi_arqos,
     output logic m_axi_arvalid,
     input logic m_axi_arready,
     input logic [3:0]m_axi_rid,
@@ -45,17 +44,9 @@ module jtag_adapter(input logic clk, reset,
     typedef enum logic [3:0] {DORMANT, READ_ARSEND, READ_VALUE, READ_DONE,  WRITE_AWSEND, WRITE_DATA, WRITE_RESPONSE, WRITE_DONE} statetype;
     statetype state, nextstate;
 
-    // 0: awready
-    // 1: wready
-    // 2: bready
-    // 3: arready
-    // 4: rready
-    logic [4:0] completion;
-
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
              state <= DORMANT;
-             completion <= 5'b0;
              dramReadData <= 32'b0;
         end
         else begin
@@ -146,7 +137,8 @@ module dma_ctrl(input logic clk, reset,
                 input logic dramValid,
                 output logic stall);
 
-    typedef enum logic [2:0] {DORMANT, D2S_BEGIN, D2S_READ_REQUEST, D2S_WRITE, D2S_ONE_COMP, D2S_DONE_OR_NEXT, DONE} statetype;
+    typedef enum logic [3:0] {DORMANT, D2S_BEGIN, D2S_READ_REQUEST, D2S_WRITE, D2S_ONE_COMP, D2S_DONE_OR_NEXT,
+                    S2D_BEGIN, S2D_READ, S2D_WRITE_REQUEST, S2D_ONE_COMP, S2D_DONE_OR_NEXT, DONE} statetype;
     statetype state, nextstate;
     logic [31:0] curData, nextSramAddress, nextDramAddress;
     logic [9:0] rest;
@@ -194,6 +186,23 @@ module dma_ctrl(input logic clk, reset,
                         nextDramAddress <= nextDramAddress+4;
                         nextSramAddress <= nextSramAddress+4;
                     end
+                S2D_BEGIN:
+                    begin
+                        rest <= width;
+                        nextSramAddress <= srcAddress;
+                        nextDramAddress <= dstAddress;
+                    end
+                S2D_READ:
+                    begin
+                        sramAddress <= nextSramAddress[15:2];
+                        dramAddress <= nextDramAddress;
+                    end
+                S2D_ONE_COMP:
+                    begin
+                        rest <= rest-1;
+                        nextDramAddress <= nextDramAddress+4;
+                        nextSramAddress <= nextSramAddress+4;
+                    end
             endcase
         end
 
@@ -203,9 +212,10 @@ module dma_ctrl(input logic clk, reset,
     */
 
     // assign dmaValid = (state == DONE);
-    assign dramWriteEnable = 1'b0; // (state == S2D_WRITE);
+    assign dramWriteEnable = (state == S2D_WRITE_REQUEST);
     assign sramWriteEnable = (state == D2S_WRITE);
     assign dramReadEnable = (state == D2S_READ_REQUEST);
+    assign dramWriteData = sramReadData;
 
     // assign nextstate = (cmd == 2'b01) ? D2S_BEGIN: DORMANT;
 
@@ -214,6 +224,7 @@ module dma_ctrl(input logic clk, reset,
             DORMANT:
                 case(cmd)
                     2'b01: nextstate = D2S_BEGIN;
+                    2'b10: nextstate = S2D_BEGIN;
                     default: nextstate = DORMANT;
                 endcase
             D2S_BEGIN:
@@ -230,6 +241,19 @@ module dma_ctrl(input logic clk, reset,
                     nextstate = DONE;
                 else
                     nextstate = D2S_READ_REQUEST;
+            S2D_BEGIN:
+                nextstate = S2D_READ;
+            S2D_READ:
+                nextstate = S2D_WRITE_REQUEST;
+            S2D_WRITE_REQUEST:
+                nextstate = dramValid ? S2D_ONE_COMP : S2D_WRITE_REQUEST;
+            S2D_ONE_COMP:
+                nextstate = S2D_DONE_OR_NEXT;
+            S2D_DONE_OR_NEXT:
+                if(rest == 10'b0)
+                    nextstate = DONE;
+                else
+                    nextstate = S2D_READ;
             DONE:
                 nextstate = DORMANT;
             default:
