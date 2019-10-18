@@ -1,7 +1,8 @@
 # $testBenchName="testbench_ddr_with_jtag_adapter"
 # $testBenchName="testbench_dma_with_jtag_adapter"
-$testBenchName="testbench_integrate_all_d2s_check_led"
+# $testBenchName="testbench_integrate_all_d2s_check_led"
 # $testBenchName="testbench_reset_clk_forever"
+$testBenchName="testbench_integrate_all_d2s_simple";
 
 $vivadoPath = "C:\Xilinx\Vivado\2019.1\bin";
 

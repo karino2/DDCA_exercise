@@ -23,7 +23,7 @@
 
 
 module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct, 
-    output logic RegWrite, output logic RegDst, output logic ALUSrc, output logic Branch, 
+    output logic RegWrite, output logic RegDst, output logic IsZeroImm, output logic ALUSrc, output logic Branch, 
     output logic MemWrite, output logic MemtoReg, logic ImmtoReg, output logic [2:0] ALUCtrl, output logic Jump, output logic Halt,
     output logic [1:0] dmaCmd //00: nothing  01: d2s   02:s2d 
     );
@@ -33,6 +33,7 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
         | (Opcode == 6'b001111) // lui
         | (Opcode==6'b001101)); // ori
     assign RegDst = Opcode == 0;
+    assign IsZeroImm = (Opcode==6'b001101); // ori
     assign ALUSrc = ((Opcode != 0) &
          ((Opcode != 6'b000100))); // beq
     assign Branch = Opcode == 6'b000100;
@@ -105,43 +106,38 @@ module mips_single #(parameter FILENAME="romdata.mem")
         else if (clk)
             if(Halt)
                 halted <= 1;
-
-    /*
-    always @(posedge clk)
-        $display("instr %h, pc %h, opcode=%b, dmaCmd=%b, stall %b", instr, pc, instr[31:26], dmaCmd, stall);
-        */
-
-    /*
-    logic [31:0] sramReadData, memAddress, sramWriteData;
-    logic sramWriteEnable;
-    sram DataMem(clk, memAddress, sramWriteEnable, sramWriteData, sramReadData);
-    */
-    
     
     logic [4:0] regAddr1, regAddr2, regWriteAddr;
     logic regWriteEnable;
     logic [31:0] regReadData1, regReadData2, regWriteData;
     
+    /*
+    always @(posedge clk)
+        $display("instr %h, pc %h, opcode=%b, dmaCmd=%b, stall %b, %h, %h", instr, pc, instr[31:26], dmaCmd, stall, regReadData1, regReadData2);
+        */
+    
     regfile_single RegFile(clk, regAddr1, regAddr2, regWriteAddr, regWriteEnable, regWriteData, regReadData1, regReadData2);
 
-    logic RegWrite, RegDst, ALUSrc, Branch; 
+    logic RegWrite, RegDst, ALUSrc, Branch, IsZeroImm; 
     logic MemWrite, MemtoReg, ImmtoReg, Jump;
     logic [2:0] ALUCtrl;
         
-    ctrlunit CtrlUnit(instr[31:26], instr[5:0], RegWrite, RegDst, ALUSrc, Branch, MemWrite, MemtoReg, ImmtoReg, ALUCtrl, Jump, Halt, dmaCmd);
+    ctrlunit CtrlUnit(instr[31:26], instr[5:0], RegWrite, RegDst, IsZeroImm, ALUSrc, Branch, MemWrite, MemtoReg, ImmtoReg, ALUCtrl, Jump, Halt, dmaCmd);
 
     assign regWriteAddr = RegDst? instr[15:11] : instr[20:16]; 
     assign regAddr1 = instr[25:21];
     assign regAddr2 = instr[20:16];
     assign regWriteEnable = RegWrite;    
     
-    logic [31:0] signImm, srcB, alures;
+    logic [31:0] signImm, zeroImm, srcB, alures, immExtend;
     
     assign signImm = {{16{instr[15]}}, instr[15:0]};
+    assign zeroImm = {16'b0, instr[15:0]};
+    assign immExtend = IsZeroImm ? zeroImm : signImm;
     
     logic cout, zero;
     
-    mux2 MuxSrcB(regReadData2, signImm, ALUSrc, srcB); 
+    mux2 MuxSrcB(regReadData2, immExtend, ALUSrc, srcB); 
     
     alu Alu(regReadData1, srcB, ALUCtrl, cout, zero, alures);
 

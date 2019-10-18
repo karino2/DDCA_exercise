@@ -12,7 +12,7 @@ module testbench_mipstest_add(
     sram DataMem(clk, sramAddress[15:2], sramWriteEnable, sramWriteData, sramReadData);
 
     mips_single #("mipstest_add.mem") dut(clk, reset, 1'b0, sramReadData, sramAddress, sramWriteData, sramWriteEnable,
-                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, 1'b0, halt);
+                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
                      
     initial begin
         clk = 0; reset = 1; #10;
@@ -196,7 +196,7 @@ module testbench_dmac_d2s(
         clk = 0; #10; clk = 1; #10; 
         assert(!dramReadEnable) else $error("DRAM read not turn off.");
         assert(sramWriteEnable) else $error("SRAM write not enabled. we=%b, state=%h", sramWriteEnable, dut.state);
-        assert(sramAddress === 12) else $error("SRAM01 write address is wrong. %h", sramAddress);
+        assert(sramAddress === 3) else $error("SRAM01 write address is wrong. %h", sramAddress);
         assert(sramWriteData === 1234) else $error("SRAM write data is wrong. %h", sramWriteData);
         assert(stall) else $error("not stall3.");
 
@@ -514,6 +514,190 @@ module testbench_d2stest_failcase(
         assert(ledval === 3'b101) else $error("ledval wrong, %b", ledval);
         assert(halt) else $error("not halted %b", halt);
         $display("d2s_test check led done");
+    end
+    
+endmodule
+
+
+module testbench_d2s_simple(
+    );
+    logic clk, reset;
+
+    logic halt;
+    logic [2:0] ledval; 
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+    /*
+    // assume in DDR,
+    // 0: 0000ffff
+    // 4: 0
+    // 8: 1
+    // C: XXXXXX
+
+*/
+    mips_single_sram_dmac_led #("d2s_simple_test.mem")
+      dut(clk, reset, 
+        halt,
+        ledval,
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+    initial begin
+        dramValid = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10;
+        clk = 1; #10; 
+        // $display("deb1, %h", dmaDstAddress);
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramReadEnable) else $error("DRAM read not invoked.");
+        assert(dramAddress === 0) else $error("DRAM read address is wrong. %h", dramAddress);
+
+        dramReadData = 32'h0000ffff;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramAddress === 4);
+
+        dramReadData = 0;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramAddress === 8);
+
+        dramReadData = 1;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        assert(dramAddress === 12);
+        dramReadData = 5555; // whatever.
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(ledval === 3'b111) else $error("ledval wrong, %b", ledval);
+        assert(halt) else $error("not halted %b", halt);
+        $display("d2s_simple test done");
+    end
+    
+endmodule
+
+/* only first data is valid case. */
+module testbench_d2s_simple_fail2(
+    );
+    logic clk, reset;
+
+    logic halt;
+    logic [2:0] ledval; 
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+    /*
+    // assume in DDR,
+    // 0: 0000ffff
+    // 4: 0
+    // 8: 1
+    // C: XXXXXX
+
+*/
+    mips_single_sram_dmac_led #("d2s_simple_test.mem")
+      dut(clk, reset, 
+        halt,
+        ledval,
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+    initial begin
+        dramValid = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10;
+        clk = 1; #10; 
+        // $display("deb1, %h", dmaDstAddress);
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramReadEnable) else $error("DRAM read not invoked.");
+        assert(dramAddress === 0) else $error("DRAM read address is wrong. %h", dramAddress);
+
+        dramReadData = 32'h0000ffff;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramAddress === 4);
+
+        dramReadData = 32'h5555aaaa;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(dramAddress === 8);
+
+        dramReadData = 32'haaaa5555;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        assert(dramAddress === 12);
+        dramReadData = 1234; // not used.
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;clk = 0; #10; clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(ledval === 3'b001) else $error("ledval wrong, %b", ledval);
+        assert(halt) else $error("not halted %b", halt);
+        $display("d2s_simple fail case test done");
     end
     
 endmodule

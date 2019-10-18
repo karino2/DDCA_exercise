@@ -11,4 +11,4 @@ refresh_hw_device [lindex [get_hw_devices] $dev]
 
 source io.tcl
 
-mw 0 1234
+# mw 0 1234
