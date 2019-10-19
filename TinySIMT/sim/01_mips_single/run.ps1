@@ -12,7 +12,8 @@
 # $testBenchName="testbench_mipstest_reset";
 # $testBenchName="testbench_d2s_simple";
 # $testBenchName="testbench_d2s_simple_fail2";
-$testBenchName="testbench_s2d_cpuonly";
+# $testBenchName="testbench_s2d_cpuonly";
+$testBenchName="testbench_dram2dram_copy";
 
 $vivadoPath = "C:\Xilinx\Vivado\2019.1\bin";
 

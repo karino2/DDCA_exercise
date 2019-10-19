@@ -1213,3 +1213,139 @@ module testbench_d2stest_check_led_mock_ddr(
     
 endmodule
 
+module testbench_dram2dram_copy(
+    );
+    logic clk, reset;
+
+    logic halt;
+    logic [2:0] ledval; 
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+    mips_single_sram_dmac_led #("dram2dram_copy_test.mem")
+      dut(clk, reset, 
+        halt,
+        ledval,
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+    initial begin
+        dramValid = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramReadEnable) else $error("dramRead not invoked");
+        assert(dramAddress === 0) else $error("dramRead wrong address");
+
+        dramReadData = 123;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramReadEnable) else $error("dramRead2 not invoked");
+        assert(dramAddress === 4) else $error("dramRead2 wrong address");
+        dramReadData = 456;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramReadEnable) else $error("dramRead3 not invoked");
+        assert(dramAddress === 8) else $error("dramRead3 wrong address");
+        dramReadData = 789;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramReadEnable) else $error("dramRead4 not invoked");
+        assert(dramAddress === 12) else $error("dramRead4 wrong address");
+        dramReadData = 5555;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dut.DataMem.SRAM[0] === 123) else $error("sram[0] wrong");
+        assert(dut.DataMem.SRAM[1] === 456) else $error("sram[1] wrong");
+        assert(dut.DataMem.SRAM[2] === 789) else $error("sram[2] wrong");
+        assert(dut.DataMem.SRAM[3] === 5555) else $error("sram[3] wrong");
+
+
+        assert(dramWriteEnable) else $error("DRAM write not invoked.");
+        assert(dramAddress === 32'h10) else $error("DRAM write address is wrong. %h", dramAddress);
+        assert(dramWriteData === 123) else $error("write data is wrong %h", dramWriteData);
+
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramWriteEnable) else $error("DRAM write2 not invoked.");
+        assert(dramAddress === 32'h14) else $error("DRAM write2 address is wrong. %h", dramAddress);
+        assert(dramWriteData === 456) else $error("write2 data is wrong %h", dramWriteData);
+
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramWriteEnable) else $error("DRAM write3 not invoked.");
+        assert(dramAddress === 32'h18) else $error("DRAM write3 address is wrong. %h", dramAddress);
+        assert(dramWriteData === 789) else $error("write3 data is wrong %h", dramWriteData);
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+        assert(dramWriteEnable) else $error("DRAM write4 not invoked.");
+        assert(dramAddress === 32'h1C) else $error("DRAM write4 address is wrong. %h", dramAddress);
+        assert(dramWriteData === 5555) else $error("write4 data is wrong %h", dramWriteData);
+
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+                repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(halt) else $error("not halted %b", halt);
+        $display("dram2dram copy test done");
+    end
+    
+endmodule
