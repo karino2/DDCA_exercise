@@ -241,3 +241,25 @@ module testbench_luiori(
     end
     
 endmodule
+
+
+module testbench_ori_unsigned(
+    );
+    logic clk, reset;
+
+    logic halt;
+
+    pipeline_with_sram #("ori_unsigned.mem") dut(clk, reset, 1'b0, halt);
+                     
+    initial begin
+        clk = 0; reset = 1; #10; reset = 0; clk = 1; #10;
+
+        repeat(30)
+            begin
+                clk = 0; #10; clk = 1; #10; 
+            end
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[1] === 32'h0000ffff) else $error("fail ori unsigned, %h", dut.u_cpu.DecodeStage.RegFile.regs[1]);
+        $display("ori unsigned test done");
+    end
+    
+endmodule

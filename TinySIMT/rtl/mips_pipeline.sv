@@ -32,8 +32,7 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
                     | (Opcode==6'b001101)); // ori
     assign RegDst = Opcode == 0;
     
-    // assign IsZeroImm = (Opcode==6'b001101); // ori
-    assign IsZeroImm = 0;
+    assign IsZeroImm = (Opcode==6'b001101); // ori
 
     assign ALUSrc = ((Opcode != 0) &
                      (Opcode != 6'b000100)); //beq
@@ -130,7 +129,7 @@ module fetch2decode(input logic clk, reset, stall, isBranch,
 endmodule
 
 module decode_stage(input logic clk, reset, regWriteEnable,
-                    RegDst, BranchD,
+                    RegDst, BranchD, IsZeroImm,
             input logic [31:0] instr,
             input logic [4:0] regWriteAddr,
             input logic [31:0] regWriteData, pcPlus4, aluResM,
@@ -143,7 +142,7 @@ module decode_stage(input logic clk, reset, regWriteEnable,
     logic [31:0] eqLeft, eqRight;
 
     regfile RegFile(clk, instr[25:21], instr[20:16], regWriteAddr, regWriteEnable, regWriteData, regReadData1, regReadData2);
-    assign immExtend = {{16{instr[15]}}, instr[15:0]};
+    assign immExtend = IsZeroImm ? {16'b0, instr[15:0]} :  {{16{instr[15]}}, instr[15:0]};
     assign outRegWriteAddr = RegDst? instr[15:11] : instr[20:16];
     
     assign eqLeft = ForwardAD ? aluResM : regReadData1;
@@ -189,7 +188,7 @@ endmodule
 
 module exec_stage(input logic clk, reset, ALUSrc,
                 input logic [2:0] ALUCtrl,
-                input logic ImmtoReg,
+                input logic ImmtoReg, 
                 input logic [31:0] regData1, regData2, immExtend, 
                 aluResM, regWriteDataW,
                 input logic [1:0] ForwardAE, ForwardBE,
@@ -360,7 +359,7 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     logic [31:0] pcBranchD, pcJumpD;                     
 
     logic halting, HaltD, HaltE, HaltM, HaltW;
-    logic ImmtoRegD, ImmtoRegE, ImmtoRegM, ImmtoRegW;
+    logic ImmtoRegD, ImmtoRegE;
     logic IsZeroImmD;
     logic [1:0] DmaCmdD;
 
@@ -412,7 +411,7 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     ctrlunit CtrlUnit(instrD[31:26], instrD[5:0], RegWriteEnableD, RegDstD, IsZeroImmD, ALUSrcD, BranchD, MemWriteEnableD,
                      MemtoRegD, ImmtoRegD, ALUCtrlD, JumpD, HaltD, DmaCmdD);
                      
-    decode_stage DecodeStage(clk, reset, RegWriteEnableW, RegDstD, BranchD, instrD, regWriteAddrW, regWriteDataW,
+    decode_stage DecodeStage(clk, reset, RegWriteEnableW, RegDstD, BranchD, IsZeroImmD, instrD, regWriteAddrW, regWriteDataW,
                           pcPlus4D, aluResM, ForwardAD, ForwardBD,
                              regData1D , regData2D, immExtendD, regWriteAddrD, pcSrcD[0], pcBranchD, pcJumpD);
     assign pcSrcD[1] = JumpD;

@@ -5,3 +5,5 @@ asm/MipsAsm/obj/
 TinySIMT/sim/01_mips_single/xsim.dir/
 TinySIMT/sim/02_mips_single_ddr/xsim.dir/
 TinySIMT/sim/03_mips_pipeline/xsim.dir/
+*.pb
+asm/asm_files/*.mem
