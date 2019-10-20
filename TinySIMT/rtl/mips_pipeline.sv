@@ -69,7 +69,6 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
             */
 
     assign Jump = Opcode == 6'b000010;
-    /*
     always_comb
         case(Opcode)
             6'b110001: // d2s
@@ -85,8 +84,6 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
                     DmaCmd = 2'b0;
                 end
         endcase
-        */
-    assign DmaCmd = 2'b0;
     assign Halt = (Opcode == 6'b001110);
 endmodule
 
@@ -154,15 +151,15 @@ module decode_stage(input logic clk, reset, regWriteEnable,
 endmodule
 
 
-module decode2exec(input logic clk, reset, flush,
+module decode2exec(input logic clk, reset, flush, stall,
             input logic [31:0] regData1D, regData2D,  
                     immExtendD, 
             input logic [4:0] regWriteAddrD, regRsD, regRtD,
-            input logic [8:0]  ctrlD,
+            input logic [10:0]  ctrlD,
             output logic [31:0] regData1E, regData2E, 
                     immExtendE, 
             output logic [4:0] regWriteAddrE, regRsE, regRtE,
-            output logic [8:0] ctrlE);
+            output logic [10:0] ctrlE);
     always_ff @(posedge clk, posedge reset)
         if(reset | flush) begin
                 regData1E <= 0;
@@ -173,7 +170,7 @@ module decode2exec(input logic clk, reset, flush,
                 regRtE <= 0;
                 ctrlE <= 0; // ctrl should mean nop if everything is false.
             end
-        else
+        else if(!stall)
             begin
                 regData1E <= regData1D;
                 regData2E <= regData2D;
@@ -190,62 +187,66 @@ module exec_stage(input logic clk, reset, ALUSrc,
                 input logic [2:0] ALUCtrl,
                 input logic ImmtoReg, 
                 input logic [31:0] regData1, regData2, immExtend, 
-                aluResM, regWriteDataW,
-                input logic [1:0] ForwardAE, ForwardBE,
                 output logic zero,
                 output logic [31:0] aluRes, memWriteData);
     logic [31:0] srcB, aluRes1;
-    logic [31:0] regData1H, regData2H;
     
-    assign regData1H = (ForwardAE == 2'b10) ? aluResM : ((ForwardAE == 2'b01) ? regWriteDataW : regData1);
-    assign regData2H = (ForwardBE == 2'b10) ? aluResM : ((ForwardBE == 2'b01) ? regWriteDataW : regData2);
-    assign memWriteData = regData2H;
+    assign memWriteData = regData2;
 
     /*
     always @(posedge clk)
         begin
-            $display("exec: regData1H=%h, regData2H=%h, regData1=%h, regData2=%h, immExtend=%h",
-                        regData1H, regData2H, regData1, regData2, immExtend);
+            $display("exec: regData1=%h, regData2=%h, regData1=%h, regData2=%h, immExtend=%h",
+                        regData1, regData2, regData1, regData2, immExtend);
         end
         */
     
     
-    mux2 MuxSrcB(regData2H, immExtend, ALUSrc, srcB); 
+    mux2 MuxSrcB(regData2, immExtend, ALUSrc, srcB); 
     
     logic cout;
-    alu Alu(regData1H, srcB, ALUCtrl, cout, zero, aluRes1);
+    alu Alu(regData1, srcB, ALUCtrl, cout, zero, aluRes1);
 
     assign aluRes = ImmtoReg ?  {immExtend[15:0], 16'b0} : aluRes1;
 
 endmodule
 
-module exec2mem(input logic clk, reset, zeroE,
-            input logic [31:0] aluResE, memWriteDataE,
+module exec2mem(input logic clk, reset, stall, zeroE,
+            input logic [31:0] aluResE, memWriteDataE, immExtendE,
+                regData1E, regData2E,
             input logic [4:0] regWriteAddrE, 
-            input logic [3:0]  ctrlE,
+            input logic [5:0]  ctrlE,
             output logic zeroM,
-            output logic [31:0] aluResM, memWriteDataM,
+            output logic [31:0] aluResM, memWriteDataM, immExtendM,
+                regData1M, regData2M,
             output logic [4:0]  regWriteAddrM,
-            output logic [3:0]  ctrlM);
+            output logic [5:0]  ctrlM);
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
                 zeroM <= 0;
                 aluResM <= 0;
                 regWriteAddrM <= 0;
                 memWriteDataM <= 0;
+                immExtendM <= 0;
+                regData1M <= 0;
+                regData2M <= 0;
                 ctrlM <= 0;
             end
-        else
+        else if(!stall)
             begin
                 zeroM <= zeroE;
                 aluResM <= aluResE;
                 regWriteAddrM <= regWriteAddrE;
                 memWriteDataM <= memWriteDataE;
+                immExtendM <= immExtendE;
+                regData1M <= regData1E;
+                regData2M <= regData2E;
                 ctrlM <= ctrlE;
             end 
 endmodule
 
-
+/*
+Now this is out of CPU.
 module mem_stage(input logic clk, reset, 
                 memWriteEnable, 
                 input logic [31:0] memAddress, memWriteData,
@@ -253,8 +254,9 @@ module mem_stage(input logic clk, reset,
 
     sram DataMem(clk, memAddress[13:0], memWriteEnable, memWriteData, memReadData);
 endmodule
+*/
 
-module mem2writeback(input logic clk, reset,
+module mem2writeback(input logic clk, reset, stall,
             input logic [31:0] aluResM, memReadDataM, 
             input logic [4:0] regWriteAddrM,
             input logic [2:0]  ctrlM,
@@ -268,7 +270,7 @@ module mem2writeback(input logic clk, reset,
                 regWriteAddrW <= 0;
                 ctrlW <= 0;
             end
-        else
+        else if(!stall)
             begin
                 aluResW <= aluResM;
                 memReadDataW <= memReadDataM;
@@ -321,7 +323,7 @@ endmodule
 
 module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     input logic clk,
-    input logic reset, stall,
+    input logic reset, dmaStall,
     input logic [31:0] sramReadData,
     output logic [31:0] sramDataAddress, sramWriteData,
     output logic sramWriteEnable,
@@ -339,8 +341,10 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
 
     logic [4:0] regWriteAddrD, regWriteAddrE, regWriteAddrM, regWriteAddrW;
     logic [31:0] pcPlus4F, instrF, pcPlus4D, instrD,
-                regData1D, regData2D, immExtendD,
-                regData1E, regData2E, immExtendE;
+                regData1D, regData2D, immExtendD,                
+                regData1E, regData2E, regData1EDash, regData2EDash, immExtendE, 
+                regData1M, regData2M, immExtendM;
+                // dash means after resolve forwarding.
 
 
     logic [31:0] memWriteDataE, memWriteDataM;
@@ -361,7 +365,9 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     logic halting, HaltD, HaltE, HaltM, HaltW;
     logic ImmtoRegD, ImmtoRegE;
     logic IsZeroImmD;
-    logic [1:0] DmaCmdD;
+    logic [1:0] DmaCmdD, DmaCmdE, DmaCmdM;
+    // regData1, regReadData2, immExtend
+    // regData1E, regData2E, immExtendE, 
 
     assign halting = HaltD|HaltE|HaltM|HaltW | halt;
     /*
@@ -397,8 +403,8 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
               ForwardAE, ForwardBE,
               ForwardAD, ForwardBD,
               StallF, StallD, FlushE);
-    fetch_stage #(FILENAME) FetchStage(clk, reset, StallF, halting, pcSrcD, pcBranchD, pcJumpD, pcPlus4F, instrF);
-    fetch2decode Fetch2Decode(clk, reset, StallD, pcSrcD[0] | pcSrcD[1], instrF, pcPlus4F, instrD, pcPlus4D);
+    fetch_stage #(FILENAME) FetchStage(clk, reset, StallF|dmaStall, halting, pcSrcD, pcBranchD, pcJumpD, pcPlus4F, instrF);
+    fetch2decode Fetch2Decode(clk, reset, StallD | dmaStall, pcSrcD[0] | pcSrcD[1], instrF, pcPlus4F, instrD, pcPlus4D);
 
     
 
@@ -415,19 +421,26 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
                           pcPlus4D, aluResM, ForwardAD, ForwardBD,
                              regData1D , regData2D, immExtendD, regWriteAddrD, pcSrcD[0], pcBranchD, pcJumpD);
     assign pcSrcD[1] = JumpD;
-    decode2exec Decode2Exec(clk, reset, FlushE, regData1D, regData2D, immExtendD, regWriteAddrD,
+    decode2exec Decode2Exec(clk, reset, FlushE, dmaStall, regData1D, regData2D, immExtendD, regWriteAddrD,
                              instrD[25:21], instrD[20:16],
-                            {ALUCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD, HaltD, ImmtoRegD},
+                            {ALUCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD, HaltD, ImmtoRegD, DmaCmdD},
                              regData1E, regData2E, immExtendE, regWriteAddrE,
                               regRsE, regRtE,
-                            {ALUCtrlE, ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE, HaltE, ImmtoRegE});
-    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, ImmtoRegE, regData1E, regData2E, immExtendE, 
-                        aluResM, regWriteDataW, ForwardAE, ForwardBE,
+                            {ALUCtrlE, ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE, HaltE, ImmtoRegE, DmaCmdE});
+
+    
+    // resolve forwarding for exec_stage. we also use this value to d2s and s2d, so calculate outside of stage module.
+    assign regData1EDash = (ForwardAE == 2'b10) ? aluResM : ((ForwardAE == 2'b01) ? regWriteDataW : regData1E);
+    assign regData2EDash = (ForwardBE == 2'b10) ? aluResM : ((ForwardBE == 2'b01) ? regWriteDataW : regData2E);
+
+
+    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, ImmtoRegE, regData1EDash, regData2EDash, immExtendE, 
                          zeroE, aluResE, memWriteDataE);
-    exec2mem Exec2Mem(clk, reset, zeroE, aluResE, memWriteDataE, regWriteAddrE, 
-                        {MemWriteEnableE,  RegWriteEnableE, MemtoRegE, HaltE},
-                        zeroM, aluResM,  memWriteDataM, regWriteAddrM,
-                        {MemWriteEnableM, RegWriteEnableM, MemtoRegM, HaltM});
+    exec2mem Exec2Mem(clk, reset, dmaStall, zeroE, aluResE,
+                        memWriteDataE, immExtendE, regData1EDash, regData2EDash, regWriteAddrE, 
+                        {MemWriteEnableE,  RegWriteEnableE, MemtoRegE, HaltE, DmaCmdE},
+                        zeroM, aluResM,  memWriteDataM, immExtendM, regData1M, regData2M, regWriteAddrM,
+                        {MemWriteEnableM, RegWriteEnableM, MemtoRegM, HaltM, DmaCmdM});
 
     /*
         mem_stage MemStage(clk, reset, MemWriteEnableM,
@@ -439,7 +452,25 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     assign sramWriteData = memWriteDataM;
     assign memReadDataM = sramReadData;
 
-    mem2writeback Mem2WriteBack(clk, reset, aluResM, memReadDataM,  regWriteAddrM,
+    assign dmaCmd = DmaCmdM;
+    // d2s in binary order:
+    // op $dramaddr $sramaddr #width
+    always_comb
+        if((DmaCmdM == 2'b01) | (DmaCmdM == 2'b10) )
+            begin
+                dmaSrcAddress = regData1M;
+                dmaDstAddress = regData2M;
+                dmaWidth = immExtendM[9:0];
+            end
+        else
+            begin
+                dmaSrcAddress = 0;
+                dmaDstAddress = 0;
+                dmaWidth = 0;
+            end
+
+
+    mem2writeback Mem2WriteBack(clk, reset, dmaStall, aluResM, memReadDataM,  regWriteAddrM,
                         {RegWriteEnableM, MemtoRegM, HaltM},
                         aluResW, memReadDataW, regWriteAddrW,
                         {RegWriteEnableW, MemtoRegW, HaltW});

@@ -263,3 +263,53 @@ module testbench_ori_unsigned(
     end
     
 endmodule
+
+module testbench_pipeline_d2s_one(
+    );
+    logic clk, reset;
+
+    logic [31:0] sramReadData, sramAddress, sramWriteData, dmaSrcAddress, dmaDstAddress;
+    logic sramWriteEnable, halt, stall;
+    logic [1:0] dmaCmd;
+    logic [9:0] dmaWidth;    
+    sram DataMem(clk, sramAddress[15:2], sramWriteEnable, sramWriteData, sramReadData);
+
+    mips_pipeline #("d2s_one_test.mem") dut(clk, reset, stall, sramReadData, sramAddress, sramWriteData, sramWriteEnable,
+                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
+                     
+    initial begin
+        stall = 0;
+        clk = 0; reset = 1; #10;
+        // $display("next instr address=%h, nextInstr=%h", pc, instr);
+        reset = 0; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        assert(dmaCmd === 2'b01) else $error("dmaCmd not invoked.");
+        $display("dmaWidth=%h", dmaWidth);
+        assert(dmaSrcAddress === 32'd16 & dmaDstAddress === 32'd24) else $error("dmaAddress error., %h, %h", dmaSrcAddress, dmaDstAddress);
+        stall = 1;
+        // $display("pc=%h, instr=%h, %b", dut.pc, dut.instr, dmaCmd);
+        $display("begin stall.");
+        repeat(10)
+            begin
+               clk=0; #10; clk=1; #10;
+            end
+        clk = 0;
+        assert(dut.DecodeStage.RegFile.regs[3] !== 32'd1234) else $error("stall fail");
+        $display("stall done.");
+        stall = 0;
+        #10;
+        clk = 1; #10;
+        // $display("pc=%h, instr=%h, %b", dut.pc, dut.instr, dmaCmd);
+        clk = 0; #10;
+        clk = 1; #10; clk = 0; #10;
+        assert(dut.DecodeStage.RegFile.regs[3] === 32'd1234) else $error("fail to resume from DMAC. reg3=%b", dut.DecodeStage.RegFile.regs[3]);
+        clk = 1; #10; clk = 0; #10;
+        $display("d2s one test done");
+    end
+    
+endmodule
+
+
