@@ -46,16 +46,6 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
             ALUCtrl = 3'b110;
         else if(Opcode == 6'b001101) // ori
             ALUCtrl = 3'b001;
-        else
-            case(Funct)
-                6'd34: ALUCtrl = 3'b110;
-                 6'b100100: ALUCtrl = 3'b000;
-                 6'b100101: ALUCtrl = 3'b001;
-                 6'b101010: ALUCtrl = 3'b111;
-                 default: ALUCtrl = 3'b010;
-            endcase
-
-/*
         else if(Opcode==6'b0)
             case(Funct)
                 6'd34: ALUCtrl = 3'b110;
@@ -66,7 +56,17 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
             endcase
         else
             ALUCtrl = 3'b010; // lw, sw, etc.
-            */
+
+        /*
+        else
+            case(Funct)
+                6'd34: ALUCtrl = 3'b110;
+                 6'b100100: ALUCtrl = 3'b000;
+                 6'b100101: ALUCtrl = 3'b001;
+                 6'b101010: ALUCtrl = 3'b111;
+                 default: ALUCtrl = 3'b010;
+            endcase
+*/
 
     assign Jump = Opcode == 6'b000010;
     always_comb
@@ -103,8 +103,10 @@ module fetch_stage #(parameter FILENAME="romdata.mem")
 
     assign instr = Halt ? 32'b0 : instrRead;
     
+    /*
     always @(posedge clk)
-        $display("instr %h", instr);    
+        $display("instr %h, pc=%h, newPC=%h, Stall=%b", instr, pc, newPC, Stall);
+        */
 
     assign newPC = (pcSrc == 2'b01) ? pcBranch:  ((pcSrc == 2'b10) ? pcJump : pcPlus4);
 
@@ -196,8 +198,8 @@ module exec_stage(input logic clk, reset, ALUSrc,
     /*
     always @(posedge clk)
         begin
-            $display("exec: regData1=%h, regData2=%h, regData1=%h, regData2=%h, immExtend=%h",
-                        regData1, regData2, regData1, regData2, immExtend);
+            $display("exec: regData1=%h, regData2=%h, srcB=%h, ALUCtrl=%b, immExtend=%h, aluRes=%h, ImmtoReg=%b",
+                        regData1, regData2, srcB, ALUCtrl, immExtend, aluRes, ImmtoReg);
         end
         */
     
@@ -370,12 +372,22 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     // regData1E, regData2E, immExtendE, 
 
     assign halting = HaltD|HaltE|HaltM|HaltW | halt;
+
     /*
     always @(posedge clk)
         begin
-            $display("regWE=%h, regDst=%h, ALUSrc=%h, Branch=%h, MemWE=%h, MemReg=%h, ALUCtrl=%h, jump=%h", 
+            $display("instrD=%h, rtD=%h, regWriteAddrE=%h, ALUSrcD=%b, cond=%b", instrD, instrD[20:16], regWriteAddrE, ALUSrcD, ((instrD[20:16] == regWriteAddrE ) & ALUSrcD == 0));
+            $display("regData2EDash=%h, ForwardBE=%b, aluResM=%h, regWriteDataW=%h, regData2E=%h, FlushE=%b", regData2EDash, ForwardBE, aluResM, regWriteDataW, regData2E, FlushE);
+            
+        end
+        */
+    /*
+    always @(posedge clk)
+        begin
+            $display("");
+            $display("regWE=%h, regDst=%h, ALUSrc=%h, Branch=%h, MemWE=%h, MemReg=%h, ALUCtrl=%h, jump=%h, dmaStall=%b", 
                         RegWriteEnableD, RegDstD, ALUSrcD, BranchD, MemWriteEnableD,
-                         MemtoRegD, ALUCtrlD, JumpD);    
+                         MemtoRegD, ALUCtrlD, JumpD, dmaStall);    
             $display("regWAddrD=%h, regWAddrE=%h, regWAddrM=%h, memRDataM=%h, memRDataW=%h", 
                         regWriteAddrD, regWriteAddrE, regWriteAddrM, memReadDataM, memReadDataW);
             $display("regData1D=%h, regData2D=%h, regData1E=%h, regData2E=%h,", 
@@ -391,6 +403,7 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
                         aluResE, aluResM, aluResW);
             $display("ForwardAE=%b, ForwardBE=%b, StallF=%b", 
                         ForwardAE, ForwardBE, StallF);
+            $display("");
         end
         */
 

@@ -312,4 +312,120 @@ module testbench_pipeline_d2s_one(
     
 endmodule
 
+module testbench_flopr();
+    logic clk, reset, en;
+    logic [31:0] nextVal, curVal;
+    
+    flopr dut(clk, reset, en, nextVal, curVal);
+    
+    initial begin
+        clk = 0;
+        en = 1;
+        reset = 1; #10;
+        reset = 0;
+        assert(curVal === 32'h0040_0000) else $error("fail reset, %h", curVal);
+        nextVal = 10; #10;
+        assert(curVal === 32'h0040_0000) else $error("fail for wait clk");
+        clk = 1; #10;
+        assert(curVal === 32'd10) else $error("fail for clk, %h", curVal);
+    end
+endmodule
 
+
+module testbench_flopr_en();
+    logic clk, reset, en;
+    logic [31:0] nextVal, curVal;
+    
+    flopr dut(clk, reset, en, nextVal, curVal);
+    
+    initial begin
+        nextVal = 0;
+        clk = 0;
+        en = 0;
+        reset = 1; #10;
+        reset = 0;
+        assert(curVal === 32'h0040_0000) else $error("fail reset, %h", curVal);
+        clk = 1; #10; clk = 0; #10; clk = 1; #10;
+        assert(curVal === 32'h0040_0000) else $error("en deasserted but update curVal.");
+        clk = 0; #10 
+        en = 1;
+        nextVal = 123;
+        clk = 1; #10;
+        assert(curVal === 32'd123) else $error("fail after en update, %h", curVal);
+    end
+endmodule
+
+
+module testbench_d2stest_cpuonly(
+    );
+    logic clk =0;
+    logic reset;
+
+    logic [31:0] sramReadData, sramAddress, sramWriteData, dmaSrcAddress, dmaDstAddress;
+    logic sramWriteEnable, halt, stall;
+    logic [1:0] dmaCmd;
+    logic [9:0] dmaWidth;    
+    sram DataMem(clk, sramAddress[15:2], sramWriteEnable, sramWriteData, sramReadData);
+
+    /*
+    // assume in DDR,
+    // 24: 123
+    // 28: 456
+    // 32: 789
+    // 34: 5555
+
+    led map
+    0x8000_0000: led[0]
+    0x8000_0004: led[1]
+    0x8000_0008: led[2]
+    */
+    mips_pipeline #("d2s_test.mem") dut(clk, reset, stall, sramReadData, sramAddress, sramWriteData, sramWriteEnable,
+                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
+
+
+   initial begin
+      repeat(200)
+        begin
+            #5ns clk = ~clk; // 100MHz
+        end
+      
+      $display("test fail");
+   end
+
+                     
+    initial begin
+        stall = 0;
+        reset = 1;
+        #10ns;
+        reset = 0;
+
+        wait(dmaCmd === 2'b01);
+        assert(dmaSrcAddress === 32'd24) else $error("dmaAddress error.");
+        wait(clk);
+        wait(!clk);
+        stall = 1;
+        // $display("pc=%h, instr=%h, %b", dut.pc, dut.instr, dmaCmd);
+        $display("=====");
+        $display("begin stall.");
+        $display("=====");
+        #50ns;
+
+        stall = 0;
+        /* 12/4, 16/4, 20/4, 24/4 */
+        DataMem.SRAM[3] = 123;
+        DataMem.SRAM[4] = 456;
+        DataMem.SRAM[5] = 789;
+        DataMem.SRAM[6] = 5555;
+        $display("=====");
+        $display("end stall.");
+        $display("=====");
+        #300ns;
+        // led is wrongly mapped to SRAM[2:0] in testbed.
+        assert(DataMem.SRAM[0] ===1 & DataMem.SRAM[1] === 1 & DataMem.SRAM[2] === 1) else $error("fail to turn on all led. mem[0]=%h, mem[1]=%h, mem[2]=%h", DataMem.SRAM[0], DataMem.SRAM[1], DataMem.SRAM[2]);
+        assert(halt) else $error("not halted");
+        $display("d2s_test cpu only: done");
+
+        $stop(0);
+    end
+    
+endmodule
