@@ -376,12 +376,16 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     /*
     always @(posedge clk)
         begin
-            $display("instrD=%h, rtD=%h, regWriteAddrE=%h, ALUSrcD=%b, cond=%b", instrD, instrD[20:16], regWriteAddrE, ALUSrcD, ((instrD[20:16] == regWriteAddrE ) & ALUSrcD == 0));
-            $display("regData2EDash=%h, ForwardBE=%b, aluResM=%h, regWriteDataW=%h, regData2E=%h, FlushE=%b", regData2EDash, ForwardBE, aluResM, regWriteDataW, regData2E, FlushE);
-            
+            $display("");
+            $display("instrD=%h, immExtendD=%h, immExtendE=%h, dstall=%b, flush=%b", instrD, immExtendD, immExtendE, dmaStall, FlushE);
+            $display("regData1D=%h, regData2D=%h, regData1E=%h, regData2E=%h,", 
+                        regData1D, regData2D, regData1E, regData2E);
+            $display("aluRes: E=%h, M=%h, W=%h", aluResE, aluResM, aluResW);
+            $display("Mem: we=%b, daddr=%h, wdata=%h, rdata=%h", MemWriteEnableM, aluResM, memWriteDataM, sramReadData);
+            $display("");
         end
         */
-    /*
+        /*
     always @(posedge clk)
         begin
             $display("");
@@ -434,11 +438,11 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
                           pcPlus4D, aluResM, ForwardAD, ForwardBD,
                              regData1D , regData2D, immExtendD, regWriteAddrD, pcSrcD[0], pcBranchD, pcJumpD);
     assign pcSrcD[1] = JumpD;
-    decode2exec Decode2Exec(clk, reset, FlushE, dmaStall, regData1D, regData2D, immExtendD, regWriteAddrD,
-                             instrD[25:21], instrD[20:16],
+    decode2exec Decode2Exec(clk, reset, FlushE & !dmaStall, dmaStall, regData1D, regData2D, immExtendD,
+                             regWriteAddrD, instrD[25:21], instrD[20:16],
                             {ALUCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD, HaltD, ImmtoRegD, DmaCmdD},
-                             regData1E, regData2E, immExtendE, regWriteAddrE,
-                              regRsE, regRtE,
+                             regData1E, regData2E, immExtendE,
+                              regWriteAddrE, regRsE, regRtE,
                             {ALUCtrlE, ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE, HaltE, ImmtoRegE, DmaCmdE});
 
     
@@ -491,3 +495,79 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
  endmodule
 
 
+module mips_pipeline_sram_dmac_led #(parameter FILENAME="romdata.mem") 
+    (input logic clk, reset, 
+        output logic halt,
+        output logic [2:0] led,
+        output logic [31:0] dramAddress, dramWriteData,
+        output logic dramWriteEnable, dramReadEnable,
+        input logic [31:0] dramReadData,
+        input logic dramValid
+    );
+
+    logic [31:0] sramReadData, sramWriteData, dmaSrcAddress, dmaDstAddress;
+    logic [13:0] sramAddress, sramAddressForDMAC;
+    logic [31:0] sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU;
+    logic sramWriteEnableForCPU;
+    logic [31:0] sramReadDataForDMAC, sramWriteDataForDMAC;
+    logic sramWriteEnableForDMAC;
+
+    logic sramWriteEnable, stall;
+    logic [1:0] dmaCmd;
+    logic [9:0] dmaWidth;
+    sram DataMem(clk, sramAddress, sramWriteEnable, sramWriteData, sramReadData);
+
+    mips_pipeline #(FILENAME) u_cpu(clk, reset, stall, sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU, sramWriteEnableForCPU,
+                                        dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
+
+    dma_ctrl u_dmac(clk, reset, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth,
+                sramReadDataForDMAC, dramReadData,
+                sramAddressForDMAC, sramWriteDataForDMAC, sramWriteEnableForDMAC,
+                dramAddress, dramWriteData, dramWriteEnable, dramReadEnable,
+                dramValid, stall);
+
+    /*
+    led map
+    0x8000_0000: led[0]
+    0x8000_0004: led[1]
+    0x8000_0008: led[2]
+    */
+    always_ff @(posedge clk, posedge reset)
+        if(reset)
+            led <= 3'b0;
+        else if(sramWriteEnableForCPU & sramAddressForCPU[31])
+            case(sramAddressForCPU[3:0])
+                4'b0: led[0] <= sramWriteDataForCPU[0];
+                4'b100: led[1] <= sramWriteDataForCPU[0];
+                4'b1000: led[2] <= sramWriteDataForCPU[0];
+            endcase
+
+  always_comb
+    if(stall)
+      begin
+        sramAddress = sramAddressForDMAC;
+        sramWriteEnable = sramWriteEnableForDMAC;
+        sramWriteData = sramWriteDataForDMAC;
+        sramReadDataForDMAC = sramReadData;
+        sramReadDataForCPU = 32'b0;        
+      end
+    else
+      begin
+        sramReadDataForDMAC = 32'b0;
+        if(sramAddressForCPU[31])
+            begin
+                sramAddress = 14'b0;
+                sramWriteEnable = 0;
+                sramWriteData = 32'b0;
+                sramReadDataForCPU = 32'b0;        
+            end
+        else
+            begin
+                sramAddress = sramAddressForCPU[15:2];
+                sramWriteEnable = sramWriteEnableForCPU;
+                sramWriteData = sramWriteDataForCPU;
+                sramReadDataForCPU = sramReadData;        
+            end
+      end
+
+endmodule

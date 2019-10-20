@@ -429,3 +429,98 @@ module testbench_d2stest_cpuonly(
     end
     
 endmodule
+
+
+module testbench_d2stest_check_led(
+    );
+    logic clk, reset;
+
+    logic halt;
+    logic [2:0] ledval; 
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+    /*
+    // assume in DDR,
+    // 24: 123
+    // 28: 456
+    // 32: 789
+    // 34: 5555
+
+    led map
+    0x8000_0000: led[0]
+    0x8000_0004: led[1]
+    0x8000_0008: led[2]
+*/
+    mips_pipeline_sram_dmac_led #("d2s_test.mem")
+      dut(clk, reset, 
+        halt,
+        ledval,
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+    initial begin
+        dramValid = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+        repeat(5)
+            begin
+                clk = 0; #10; clk = 1; #10;
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramReadEnable) else $error("DRAM read not invoked.");
+        assert(dramAddress === 24) else $error("DRAM read address is wrong. %h", dramAddress);
+
+        dramReadData = 123;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(3)
+            begin
+                clk = 0; #10; clk = 1; #10;
+                clk = 0; #10; clk = 1; #10;
+            end
+        assert(dramAddress === 28);
+
+        dramReadData = 456;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(3)
+            begin
+                clk = 0; #10; clk = 1; #10;
+                clk = 0; #10; clk = 1; #10;
+            end
+        assert(dramAddress === 32);
+
+        dramReadData = 789;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(3)
+            begin
+                clk = 0; #10; clk = 1; #10;
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramAddress === 36);
+        dramReadData = 5555;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(ledval === 3'b111) else $error("ledval wrong, %b", ledval);
+        assert(halt) else $error("not halted %b", halt);
+        $display("d2s_test check led done");
+    end
+    
+endmodule
