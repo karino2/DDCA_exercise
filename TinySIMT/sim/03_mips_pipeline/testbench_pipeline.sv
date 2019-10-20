@@ -220,3 +220,24 @@ module testbench_mipstest_reset(
         $display("reset test end");
     end
 endmodule
+
+module testbench_luiori(
+    );
+    logic clk, reset;
+
+    logic halt;
+
+    pipeline_with_sram #("luiori_test.mem") dut(clk, reset, 1'b0, halt);
+                     
+    initial begin
+        clk = 0; reset = 1; #10; reset = 0; clk = 1; #10;
+
+        repeat(30)
+            begin
+                clk = 0; #10; clk = 1; #10; 
+            end
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[1] === 32'h04d2162e) else $error("fail lui ori, %h", dut.u_cpu.DecodeStage.RegFile.regs[1]);
+        $display("mips lui ori test done");
+    end
+    
+endmodule

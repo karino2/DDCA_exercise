@@ -27,23 +27,26 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
     
     assign RegWrite = ((Opcode == 0)
                      | (Opcode == 6'b100011) // lw
-                      | (Opcode == 6'b001000)); // addi
-                      /*
+                      | (Opcode == 6'b001000) // addi
                     | (Opcode == 6'b001111) // lui
                     | (Opcode==6'b001101)); // ori
-                    */
     assign RegDst = Opcode == 0;
     
     // assign IsZeroImm = (Opcode==6'b001101); // ori
     assign IsZeroImm = 0;
 
-    assign ALUSrc = ((Opcode != 0) & (Opcode != 6'b000100));
+    assign ALUSrc = ((Opcode != 0) &
+                     (Opcode != 6'b000100)); //beq
     assign Branch = Opcode == 6'b000100;
     assign MemWrite = Opcode == 6'b101011;
     assign MemtoReg = Opcode == 6'b100011;
+    assign ImmtoReg = Opcode == 6'b001111; // lui
+
     always_comb
         if(Opcode == 6'b000100)
             ALUCtrl = 3'b110;
+        else if(Opcode == 6'b001101) // ori
+            ALUCtrl = 3'b001;
         else
             case(Funct)
                 6'd34: ALUCtrl = 3'b110;
@@ -52,9 +55,21 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
                  6'b101010: ALUCtrl = 3'b111;
                  default: ALUCtrl = 3'b010;
             endcase
+
+/*
+        else if(Opcode==6'b0)
+            case(Funct)
+                6'd34: ALUCtrl = 3'b110;
+                 6'b100100: ALUCtrl = 3'b000;
+                 6'b100101: ALUCtrl = 3'b001;
+                 6'b101010: ALUCtrl = 3'b111;
+                 default: ALUCtrl = 3'b010;
+            endcase
+        else
+            ALUCtrl = 3'b010; // lw, sw, etc.
+            */
+
     assign Jump = Opcode == 6'b000010;
-    // assign ImmtoReg = Opcode == 6'b001111; // lui
-    assign ImmtoReg = 0;
     /*
     always_comb
         case(Opcode)
@@ -144,11 +159,11 @@ module decode2exec(input logic clk, reset, flush,
             input logic [31:0] regData1D, regData2D,  
                     immExtendD, 
             input logic [4:0] regWriteAddrD, regRsD, regRtD,
-            input logic [7:0]  ctrlD,
+            input logic [8:0]  ctrlD,
             output logic [31:0] regData1E, regData2E, 
                     immExtendE, 
             output logic [4:0] regWriteAddrE, regRsE, regRtE,
-            output logic [7:0] ctrlE);
+            output logic [8:0] ctrlE);
     always_ff @(posedge clk, posedge reset)
         if(reset | flush) begin
                 regData1E <= 0;
@@ -174,12 +189,13 @@ endmodule
 
 module exec_stage(input logic clk, reset, ALUSrc,
                 input logic [2:0] ALUCtrl,
+                input logic ImmtoReg,
                 input logic [31:0] regData1, regData2, immExtend, 
                 aluResM, regWriteDataW,
                 input logic [1:0] ForwardAE, ForwardBE,
                 output logic zero,
                 output logic [31:0] aluRes, memWriteData);
-    logic [31:0] srcB;
+    logic [31:0] srcB, aluRes1;
     logic [31:0] regData1H, regData2H;
     
     assign regData1H = (ForwardAE == 2'b10) ? aluResM : ((ForwardAE == 2'b01) ? regWriteDataW : regData1);
@@ -198,7 +214,9 @@ module exec_stage(input logic clk, reset, ALUSrc,
     mux2 MuxSrcB(regData2H, immExtend, ALUSrc, srcB); 
     
     logic cout;
-    alu Alu(regData1H, srcB, ALUCtrl, cout, zero, aluRes);
+    alu Alu(regData1H, srcB, ALUCtrl, cout, zero, aluRes1);
+
+    assign aluRes = ImmtoReg ?  {immExtend[15:0], 16'b0} : aluRes1;
 
 endmodule
 
@@ -207,7 +225,7 @@ module exec2mem(input logic clk, reset, zeroE,
             input logic [4:0] regWriteAddrE, 
             input logic [3:0]  ctrlE,
             output logic zeroM,
-            output logic [31:0] aluResM, memWriteDataM, 
+            output logic [31:0] aluResM, memWriteDataM,
             output logic [4:0]  regWriteAddrM,
             output logic [3:0]  ctrlM);
     always_ff @(posedge clk, posedge reset)
@@ -265,7 +283,7 @@ module writeback_stage(input logic clk, reset,
                         MemtoReg,
                         input logic [31:0] aluRes, memReadData,
                         output logic [31:0] regWriteData);
-    mux2 ResForReg(aluRes, memReadData, MemtoReg, regWriteData);
+    assign regWriteData = MemtoReg ? memReadData : aluRes;
 endmodule
 
 module hazard(input logic [4:0] regRsD, regRtD, regRsE, regRtE,
@@ -325,6 +343,7 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
                 regData1D, regData2D, immExtendD,
                 regData1E, regData2E, immExtendE;
 
+
     logic [31:0] memWriteDataE, memWriteDataM;
     logic [31:0] aluResE, aluResM;
     logic zeroE;
@@ -341,7 +360,9 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     logic [31:0] pcBranchD, pcJumpD;                     
 
     logic halting, HaltD, HaltE, HaltM, HaltW;
-    logic ImmtoRegD, IsZerImmD, DmaCmdD;
+    logic ImmtoRegD, ImmtoRegE, ImmtoRegM, ImmtoRegW;
+    logic IsZeroImmD;
+    logic [1:0] DmaCmdD;
 
     assign halting = HaltD|HaltE|HaltM|HaltW | halt;
     /*
@@ -397,11 +418,11 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     assign pcSrcD[1] = JumpD;
     decode2exec Decode2Exec(clk, reset, FlushE, regData1D, regData2D, immExtendD, regWriteAddrD,
                              instrD[25:21], instrD[20:16],
-                            {ALUCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD, HaltD},
+                            {ALUCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD, HaltD, ImmtoRegD},
                              regData1E, regData2E, immExtendE, regWriteAddrE,
                               regRsE, regRtE,
-                            {ALUCtrlE, ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE, HaltE});
-    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, regData1E, regData2E, immExtendE, 
+                            {ALUCtrlE, ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE, HaltE, ImmtoRegE});
+    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, ImmtoRegE, regData1E, regData2E, immExtendE, 
                         aluResM, regWriteDataW, ForwardAE, ForwardBE,
                          zeroE, aluResE, memWriteDataE);
     exec2mem Exec2Mem(clk, reset, zeroE, aluResE, memWriteDataE, regWriteAddrE, 
@@ -419,7 +440,7 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     assign sramWriteData = memWriteDataM;
     assign memReadDataM = sramReadData;
 
-    mem2writeback Mem2WriteBack(clk, reset, aluResM, memReadDataM, regWriteAddrM,
+    mem2writeback Mem2WriteBack(clk, reset, aluResM, memReadDataM,  regWriteAddrM,
                         {RegWriteEnableM, MemtoRegM, HaltM},
                         aluResW, memReadDataW, regWriteAddrW,
                         {RegWriteEnableW, MemtoRegW, HaltW});
