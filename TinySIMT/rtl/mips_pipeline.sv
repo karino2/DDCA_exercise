@@ -22,7 +22,7 @@
 module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct, 
     output logic RegWrite, output logic RegDst, output logic IsZeroImm,  output logic ALUSrc, output logic Branch, 
     output logic MemWrite, output logic MemtoReg, output logic ImmtoReg, output logic [2:0] ALUCtrl, output logic Jump, output logic Halt,
-    output logic [1:0] dmaCmd //00: nothing  01: d2s   02:s2d 
+    output logic [1:0] DmaCmd //00: nothing  01: d2s   02:s2d 
     );
     
     assign RegWrite = ((Opcode == 0)
@@ -60,38 +60,37 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
         case(Opcode)
             6'b110001: // d2s
                 begin
-                    dmaCmd = 2'b01;
+                    DmaCmd = 2'b01;
                 end
             6'b111001: // s2d
                 begin
-                    dmaCmd = 2'b10;
+                    DmaCmd = 2'b10;
                 end
             default:
                 begin
-                    dmaCmd = 2'b0;
+                    DmaCmd = 2'b0;
                 end
         endcase
         */
-    assign dmaCmd = 2'b0;
-    // assign Halt = (Opcode == 6'b001110);
-    assign Halt = 0;
-
-
+    assign DmaCmd = 2'b0;
+    assign Halt = (Opcode == 6'b001110);
 endmodule
 
 /*
 module romcode #(parameter FILENAME="romdata.mem")(input logic [13:0] addr,
 */
 module fetch_stage #(parameter FILENAME="romdata.mem")
-            (input logic clk, reset, Stall,
+            (input logic clk, reset, Stall, Halt,
              input logic [1:0] pcSrc,
                 input logic [31:0] pcBranch, pcJump,
                 output logic [31:0] pcPlus4, instr);
-    logic [31:0] pc, newPC;
+    logic [31:0] pc, newPC, instrRead;
 
     flopr Pcflop(clk, reset, !Stall, newPC, pc);
-    romcode #(FILENAME) InstRom(pc[15:2], instr);    
+    romcode #(FILENAME) InstRom(pc[15:2], instrRead);    
     assign pcPlus4 = pc+4;
+
+    assign instr = Halt ? 32'b0 : instrRead;
     
     always @(posedge clk)
         $display("instr %h", instr);    
@@ -145,11 +144,11 @@ module decode2exec(input logic clk, reset, flush,
             input logic [31:0] regData1D, regData2D,  
                     immExtendD, 
             input logic [4:0] regWriteAddrD, regRsD, regRtD,
-            input logic [6:0]  ctrlD,
+            input logic [7:0]  ctrlD,
             output logic [31:0] regData1E, regData2E, 
                     immExtendE, 
             output logic [4:0] regWriteAddrE, regRsE, regRtE,
-            output logic [6:0] ctrlE);
+            output logic [7:0] ctrlE);
     always_ff @(posedge clk, posedge reset)
         if(reset | flush) begin
                 regData1E <= 0;
@@ -206,11 +205,11 @@ endmodule
 module exec2mem(input logic clk, reset, zeroE,
             input logic [31:0] aluResE, memWriteDataE,
             input logic [4:0] regWriteAddrE, 
-            input logic [2:0]  ctrlE,
+            input logic [3:0]  ctrlE,
             output logic zeroM,
             output logic [31:0] aluResM, memWriteDataM, 
             output logic [4:0]  regWriteAddrM,
-            output logic [2:0]  ctrlM);
+            output logic [3:0]  ctrlM);
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
                 zeroM <= 0;
@@ -241,10 +240,10 @@ endmodule
 module mem2writeback(input logic clk, reset,
             input logic [31:0] aluResM, memReadDataM, 
             input logic [4:0] regWriteAddrM,
-            input logic [1:0]  ctrlM,
+            input logic [2:0]  ctrlM,
             output logic [31:0] aluResW, memReadDataW,
             output logic [4:0] regWriteAddrW,
-            output logic [1:0]  ctrlW);
+            output logic [2:0]  ctrlW);
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
                 aluResW <= 0;
@@ -274,6 +273,7 @@ module hazard(input logic [4:0] regRsD, regRtD, regRsE, regRtE,
               input logic [4:0] regWriteAddrE, input logic RegWriteEnableE, input logic MemtoRegE,
               input logic [4:0] regWriteAddrM, input logic RegWriteEnableM, input logic MemtoRegM,
               input logic [4:0] regWriteAddrW, input logic RegWriteEnableW,
+              input logic Halt,
               output logic [1:0] ForwardAE, ForwardBE,
               output logic ForwardAD, ForwardBD,
               output logic StallF, StallD, FlushE);
@@ -296,8 +296,8 @@ module hazard(input logic [4:0] regRsD, regRtD, regRsE, regRtE,
     assign branchstall = branchStallALU | branchStallLw; 
     
     
-    assign StallF = lwstall | branchstall;
-    assign StallD = lwstall | branchstall;
+    assign StallF = lwstall | branchstall | Halt;
+    assign StallD = lwstall | branchstall | Halt;
     assign FlushE = lwstall | branchstall | JumpD;
 endmodule
                 
@@ -313,10 +313,6 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     output logic [9:0] dmaWidth,
     output logic halt
     );
-
-    assign halt = 0;
-
-
     logic RegWriteEnableD, RegDstD, ALUSrcD, BranchD, MemWriteEnableD, MemtoRegD, JumpD;
     logic [2:0] ALUCtrlD, ALUCtrlE;
 
@@ -343,7 +339,11 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     logic [1:0] pcSrcD;
     logic ForwardAD, ForwardBD;
     logic [31:0] pcBranchD, pcJumpD;                     
-    
+
+    logic halting, HaltD, HaltE, HaltM, HaltW;
+    logic ImmtoRegD, IsZerImmD, DmaCmdD;
+
+    assign halting = HaltD|HaltE|HaltM|HaltW | halt;
     /*
     always @(posedge clk)
         begin
@@ -373,15 +373,23 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
               regWriteAddrE, RegWriteEnableE, MemtoRegE,
               regWriteAddrM, RegWriteEnableM, MemtoRegM,
               regWriteAddrW, RegWriteEnableW,
+              halting,
               ForwardAE, ForwardBE,
               ForwardAD, ForwardBD,
               StallF, StallD, FlushE);
-    fetch_stage #(FILENAME) FetchStage(clk, reset, StallF, pcSrcD, pcBranchD, pcJumpD, pcPlus4F, instrF);
+    fetch_stage #(FILENAME) FetchStage(clk, reset, StallF, halting, pcSrcD, pcBranchD, pcJumpD, pcPlus4F, instrF);
     fetch2decode Fetch2Decode(clk, reset, StallD, pcSrcD[0] | pcSrcD[1], instrF, pcPlus4F, instrD, pcPlus4D);
 
-    logic ImmtoRegD, HaltD, IsZerImmD, DmaCmdD;
+    
+
+    always_ff @(posedge clk, posedge reset)
+        if(reset)
+            halt <= 1'b0;
+        else if(HaltW)
+            halt <= 1'b1;
+
     ctrlunit CtrlUnit(instrD[31:26], instrD[5:0], RegWriteEnableD, RegDstD, IsZeroImmD, ALUSrcD, BranchD, MemWriteEnableD,
-                     MemtoRegD, ImmtoRegD, ALUCtrlD, JumpD, DmaCmdD);
+                     MemtoRegD, ImmtoRegD, ALUCtrlD, JumpD, HaltD, DmaCmdD);
                      
     decode_stage DecodeStage(clk, reset, RegWriteEnableW, RegDstD, BranchD, instrD, regWriteAddrW, regWriteDataW,
                           pcPlus4D, aluResM, ForwardAD, ForwardBD,
@@ -389,17 +397,17 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     assign pcSrcD[1] = JumpD;
     decode2exec Decode2Exec(clk, reset, FlushE, regData1D, regData2D, immExtendD, regWriteAddrD,
                              instrD[25:21], instrD[20:16],
-                            {ALUCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD},
+                            {ALUCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD, HaltD},
                              regData1E, regData2E, immExtendE, regWriteAddrE,
                               regRsE, regRtE,
-                            {ALUCtrlE, ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE});
+                            {ALUCtrlE, ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE, HaltE});
     exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, regData1E, regData2E, immExtendE, 
                         aluResM, regWriteDataW, ForwardAE, ForwardBE,
                          zeroE, aluResE, memWriteDataE);
     exec2mem Exec2Mem(clk, reset, zeroE, aluResE, memWriteDataE, regWriteAddrE, 
-                        {MemWriteEnableE,  RegWriteEnableE, MemtoRegE},
+                        {MemWriteEnableE,  RegWriteEnableE, MemtoRegE, HaltE},
                         zeroM, aluResM,  memWriteDataM, regWriteAddrM,
-                        {MemWriteEnableM, RegWriteEnableM, MemtoRegM});
+                        {MemWriteEnableM, RegWriteEnableM, MemtoRegM, HaltM});
 
     /*
         mem_stage MemStage(clk, reset, MemWriteEnableM,
@@ -412,9 +420,9 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     assign memReadDataM = sramReadData;
 
     mem2writeback Mem2WriteBack(clk, reset, aluResM, memReadDataM, regWriteAddrM,
-                        {RegWriteEnableM, MemtoRegM},
+                        {RegWriteEnableM, MemtoRegM, HaltM},
                         aluResW, memReadDataW, regWriteAddrW,
-                        {RegWriteEnableW, MemtoRegW});
+                        {RegWriteEnableW, MemtoRegW, HaltW});
     writeback_stage WriteBackStage(clk, reset, MemtoRegW, aluResW, memReadDataW, regWriteDataW);
  endmodule
 

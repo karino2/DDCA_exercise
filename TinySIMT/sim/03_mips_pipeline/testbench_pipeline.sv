@@ -207,6 +207,9 @@ module testbench_mipstest_reset(
         $display("reset test begin");
         clk = 0; reset = 1; #10; reset = 0; clk = 1; #10;
         clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        assert(!halt) else $error("wrongly halted before reach to write back stage.");
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         assert(halt) else $error("not halted");
 
         $display("pc=%h", dut.u_cpu.FetchStage.pc);
