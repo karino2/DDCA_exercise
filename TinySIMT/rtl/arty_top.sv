@@ -506,11 +506,11 @@ module mux_axi(input logic control,
 endmodule
 
 
-// module arty_top #(parameter FILENAME="s2d_test.mem")  (
-// module arty_top #(parameter FILENAME="d2s_simple_test.mem")  (
-// module arty_top #(parameter FILENAME="dram2dram_copy_test.mem")  (
-// module arty_top #(parameter FILENAME="d2s_simple_writeback_test.mem")  (
-module arty_top #(parameter FILENAME="dram2dram_register_test.mem")  (
+// module arty_top_single #(parameter FILENAME="s2d_test.mem")  (
+// module arty_top_single #(parameter FILENAME="d2s_simple_test.mem")  (
+// module arty_top_single #(parameter FILENAME="dram2dram_copy_test.mem")  (
+// module arty_top_single #(parameter FILENAME="d2s_simple_writeback_test.mem")  (
+module arty_top_single #(parameter FILENAME="dram2dram_register_test.mem")  (
   inout [15:0]  ddr3_dq,
   inout [1:0]   ddr3_dqs_n,
   inout [1:0]   ddr3_dqs_p,

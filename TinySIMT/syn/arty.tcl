@@ -4,7 +4,7 @@
 
 set_param general.maxThreads 8
 
-set top    {arty_top}
+set top    {arty_top_single}
 set part   {xc7a35ticsg324-1L}
 set board  {digilentinc.com:arty:part0:1.1}
 set debug  0

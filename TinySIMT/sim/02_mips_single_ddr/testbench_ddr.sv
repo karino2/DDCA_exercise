@@ -600,7 +600,7 @@ module testbench_integrate_all_d2s_check_led;
    glbl glbl();
 
 
-   arty_top dut (
+   arty_top_single dut (
      .ddr3_dq      (ddr3_dq),
      .ddr3_dqs_n   (ddr3_dqs_n),
      .ddr3_dqs_p   (ddr3_dqs_p),
@@ -707,7 +707,7 @@ module testbench_integrate_all_d2s_simple;
    glbl glbl();
 
 
-   arty_top #("d2s_simple_test.mem") dut (
+   arty_top_single #("d2s_simple_test.mem") dut (
      .ddr3_dq      (ddr3_dq),
      .ddr3_dqs_n   (ddr3_dqs_n),
      .ddr3_dqs_p   (ddr3_dqs_p),
@@ -812,7 +812,7 @@ module testbench_reset_clk_forever;
 
    glbl glbl();
 
-   arty_top #("halt_test.mem") dut (
+   arty_top_single #("halt_test.mem") dut (
      .ddr3_dq      (ddr3_dq),
      .ddr3_dqs_n   (ddr3_dqs_n),
      .ddr3_dqs_p   (ddr3_dqs_p),
