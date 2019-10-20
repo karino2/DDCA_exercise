@@ -129,8 +129,10 @@ module regfile(
             $display("reg write: a3=%h, wd3=%h", a3, wd3);
         end
 
+    /*
     always @(posedge clk)
         $display("1=%h, 2=%h, 3=%h, 4=%h, 5=%h, 6=%h, 7=%h, 8=%h", regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7], regs[8]);
+        */
         
     assign rd1 = (a1 == 0)? 0 : regs[a1];
     assign rd2 = (a2 == 0)?  0 : regs[a2];    

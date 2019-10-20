@@ -50,12 +50,35 @@ module testbench_ctrlunit();
 
 endmodule
 
+module pipeline_with_sram #(parameter FILENAME="mipstest.mem") (
+    input logic clk,
+    input logic reset, stall,
+    output logic halt
+    );
+    logic [31:0] sramReadData;
+    logic [31:0] sramDataAddress, sramWriteData;
+    logic sramWriteEnable;
+    logic [1:0] dmaCmd; //00: nothing  01: d2s   10:s2d 
+    logic [31:0] dmaSrcAddress, dmaDstAddress;
+    logic [9:0] dmaWidth;
+    
+    mips_pipeline #(FILENAME) u_cpu(
+        clk, reset, stall,
+        sramReadData, sramDataAddress, sramWriteData, sramWriteEnable,
+        dmaCmd, //00: nothing  01: d2s   10:s2d 
+        dmaSrcAddress, dmaDstAddress, dmaWidth,
+        halt
+    );
+    sram DataMem(clk, sramDataAddress[15:2], sramWriteEnable, sramWriteData, sramReadData);
+
+endmodule
+
 
 module testbench_mipstest_add(
     );
-    logic clk, reset;
+    logic clk, reset, halt;
 
-    mips_pipeline #("mipstest_add.mem") dut(clk, reset);
+    pipeline_with_sram #("mipstest_add.mem") dut(clk, reset, 0, halt);
     
     initial begin
         clk = 0; reset = 1; #10;
@@ -65,8 +88,8 @@ module testbench_mipstest_add(
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
-        assert(dut.DecodeStage.RegFile.regs[3] == 32'd8) else $error("fail reg3 add, %b", dut.DecodeStage.RegFile.regs[3]);
-        assert(dut.DecodeStage.RegFile.regs[4] == 32'd11) else $error("fail reg4 add, %b", dut.DecodeStage.RegFile.regs[4]);
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[3] == 32'd8) else $error("fail reg3 add, %b", dut.u_cpu.DecodeStage.RegFile.regs[3]);
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[4] == 32'd11) else $error("fail reg4 add, %b", dut.u_cpu.DecodeStage.RegFile.regs[4]);
         $display("mips add test done");
     end
     
@@ -75,9 +98,9 @@ endmodule
 
 module testbench_mipstest_lwsw(
     );
-    logic clk, reset;
+    logic clk, reset, halt;
 
-    mips_pipeline #("mipstest_lwsw.mem") dut(clk, reset);
+    pipeline_with_sram #("mipstest_lwsw.mem") dut(clk, reset, 0, halt);
     
     initial begin
         clk = 0; reset = 1; #10;
@@ -91,7 +114,7 @@ module testbench_mipstest_lwsw(
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
         clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
-        assert(dut.DecodeStage.RegFile.regs[5] == 32'd8) else $error("fail reg5 lwsw, %b", dut.DecodeStage.RegFile.regs[5]);
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[5] == 32'd8) else $error("fail reg5 lwsw, %b", dut.u_cpu.DecodeStage.RegFile.regs[5]);
         $display("mips lwsw test done");
     end
     
@@ -99,9 +122,9 @@ endmodule
 
 module testbench_mipstest_beq(
     );
-    logic clk, reset;
+    logic clk, reset, halt;
 
-    mips_pipeline #("mipstest_beq.mem") dut(clk, reset);
+    pipeline_with_sram #("mipstest_beq.mem") dut(clk, reset, 0, halt);
                          
     initial begin
         clk = 0; reset = 1; #10;
@@ -112,9 +135,9 @@ module testbench_mipstest_beq(
         clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
         clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
         $display("mips beq test begin");
-        assert(dut.DecodeStage.RegFile.regs[4] === 6) else $error("first jump is occure wrongly, %h", dut.DecodeStage.RegFile.regs[4]);
-        assert(dut.DecodeStage.RegFile.regs[5] === 7) else $error("second jump is not occure wrongly, %h", dut.DecodeStage.RegFile.regs[5]);
-        assert(dut.DecodeStage.RegFile.regs[6] === 3) else $error("second jump seems jump too much, %h", dut.DecodeStage.RegFile.regs[6]);
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[4] === 6) else $error("first jump is occure wrongly, %h", dut.u_cpu.DecodeStage.RegFile.regs[4]);
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[5] === 7) else $error("second jump is not occure wrongly, %h", dut.u_cpu.DecodeStage.RegFile.regs[5]);
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[6] === 3) else $error("second jump seems jump too much, %h", dut.u_cpu.DecodeStage.RegFile.regs[6]);
         $display("mips beq test end");
     end
     
@@ -122,9 +145,9 @@ endmodule
 
 module testbench_mipstest_orand(
     );
-    logic clk, reset;
+    logic clk, reset, halt;
 
-    mips_pipeline #("mipstest_orand.mem") dut(clk, reset);
+    pipeline_with_sram #("mipstest_orand.mem") dut(clk, reset, 0, halt);
                          
     initial begin
         clk = 0; reset = 1; #10;
@@ -135,9 +158,9 @@ module testbench_mipstest_orand(
         clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
         clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10; clk = 1; #10; 
         $display("mips orand test begin");
-        assert(dut.DecodeStage.RegFile.regs[7] === 3) else $error("addi hazard of $7 fail, %h", dut.DecodeStage.RegFile.regs[7]);
-        assert(dut.DecodeStage.RegFile.regs[4] === 7) else $error("or hazard fail, %h", dut.DecodeStage.RegFile.regs[4]);
-        assert(dut.DecodeStage.RegFile.regs[5] === 4) else $error("and hazard fail. %h", dut.DecodeStage.RegFile.regs[5]);
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[7] === 3) else $error("addi hazard of $7 fail, %h", dut.u_cpu.DecodeStage.RegFile.regs[7]);
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[4] === 7) else $error("or hazard fail, %h", dut.u_cpu.DecodeStage.RegFile.regs[4]);
+        assert(dut.u_cpu.DecodeStage.RegFile.regs[5] === 4) else $error("and hazard fail. %h", dut.u_cpu.DecodeStage.RegFile.regs[5]);
         $display("mips orand test end");
     end
     
@@ -148,15 +171,15 @@ endmodule
 // Test bench writen in text book 7.6.3.
 module testbench_mipstest_books(
     );
-    logic clk, reset;
+    logic clk, reset, halt;
 
-    mips_pipeline #("mipstest.mem") dut(clk, reset);
+    pipeline_with_sram #("mipstest.mem") dut(clk, reset, 1'b0, halt);
                      
     initial begin
         clk = 0; reset = 1; #10;
         reset = 0; #10;
     end
-    
+
     always
         begin
             clk <= 1; #5; clk <= 0; #5;
@@ -164,9 +187,33 @@ module testbench_mipstest_books(
         
     always @(negedge clk)
         begin
-            if(dut.MemStage.DataMem.SRAM[84] === 7) begin
+            // 84
+            if(dut.DataMem.SRAM[21] === 7) begin
                 $display("Simulation succeeded");
                 $stop;
             end
         end    
+endmodule
+
+
+
+module testbench_mipstest_reset(
+    );
+    logic clk, reset, halt;
+
+    pipeline_with_sram #("halt_test.mem") dut(clk, reset, 1'b0, halt);
+                     
+    initial begin
+        $display("reset test begin");
+        clk = 0; reset = 1; #10; reset = 0; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        assert(halt) else $error("not halted");
+
+        $display("pc=%h", dut.u_cpu.FetchStage.pc);
+        clk = 0; reset = 1; #10; clk=1; #10;
+        clk = 0; reset = 0; #10; 
+        clk = 1; #10;
+        $display("pc=%h", dut.u_cpu.FetchStage.pc);
+        $display("reset test end");
+    end
 endmodule
