@@ -1043,3 +1043,455 @@ mux_axi u_mux_axi(halt,
   m_axi_rready);
 
 endmodule
+
+
+
+module arty_top_pipeline #(parameter FILENAME="d2s_simple_writeback_test.mem")  (
+  inout [15:0]  ddr3_dq,
+  inout [1:0]   ddr3_dqs_n,
+  inout [1:0]   ddr3_dqs_p,
+  output [13:0] ddr3_addr,
+  output [2:0]  ddr3_ba,
+  output        ddr3_ras_n,
+  output        ddr3_cas_n,
+  output        ddr3_we_n,
+  output        ddr3_reset_n,
+  output [0:0]  ddr3_ck_p,
+  output [0:0]  ddr3_ck_n,
+  output [0:0]  ddr3_cke,
+  output [0:0]  ddr3_cs_n,
+  output [1:0]  ddr3_dm,
+  output [0:0]  ddr3_odt,
+  output [3:0]  led,
+  input [3:0] btn,
+  input         sys_clk,
+  input         sys_rstn
+  );
+
+  logic [3:0]   m_axi_awid;
+  logic [31:0]  m_axi_awaddr;
+  logic [7:0]   m_axi_awlen;
+  logic [2:0]   m_axi_awsize;
+  logic [1:0]   m_axi_awburst;
+  logic         m_axi_awlock;
+  logic [3:0]   m_axi_awcache;
+  logic [2:0]   m_axi_awprot;
+  logic         m_axi_awvalid;
+  logic         m_axi_awready;
+  logic [31:0]  m_axi_wdata;
+  logic [3:0]   m_axi_wstrb;
+  logic         m_axi_wlast;
+  logic         m_axi_wvalid;
+  logic         m_axi_wready;
+  logic         m_axi_bready;
+  logic [3:0]   m_axi_bid;
+  logic [1:0]   m_axi_bresp;
+  logic         m_axi_bvalid;
+  logic [3:0]   m_axi_arid;
+  logic [31:0]  m_axi_araddr;
+  logic [7:0]   m_axi_arlen;
+  logic [2:0]   m_axi_arsize;
+  logic [1:0]   m_axi_arburst;
+  logic         m_axi_arlock;
+  logic [3:0]   m_axi_arcache;
+  logic [2:0]   m_axi_arprot;
+  logic         m_axi_arvalid;
+  logic         m_axi_arready;
+  logic         m_axi_rready;
+  logic [3:0]   m_axi_rid;
+  logic [31:0]  m_axi_rdata;
+  logic [1:0]   m_axi_rresp;
+  logic         m_axi_rlast;
+  logic         m_axi_rvalid;
+
+  logic [3:0]   m1_axi_awid;
+  logic [31:0]  m1_axi_awaddr;
+  logic [7:0]   m1_axi_awlen;
+  logic [2:0]   m1_axi_awsize;
+  logic [1:0]   m1_axi_awburst;
+  logic         m1_axi_awlock;
+  logic [3:0]   m1_axi_awcache;
+  logic [2:0]   m1_axi_awprot;
+  logic         m1_axi_awvalid;
+  logic         m1_axi_awready;
+  logic [31:0]  m1_axi_wdata;
+  logic [3:0]   m1_axi_wstrb;
+  logic         m1_axi_wlast;
+  logic         m1_axi_wvalid;
+  logic         m1_axi_wready;
+  logic         m1_axi_bready;
+  logic [3:0]   m1_axi_bid;
+  logic [1:0]   m1_axi_bresp;
+  logic         m1_axi_bvalid;
+  logic [3:0]   m1_axi_arid;
+  logic [31:0]  m1_axi_araddr;
+  logic [7:0]   m1_axi_arlen;
+  logic [2:0]   m1_axi_arsize;
+  logic [1:0]   m1_axi_arburst;
+  logic         m1_axi_arlock;
+  logic [3:0]   m1_axi_arcache;
+  logic [2:0]   m1_axi_arprot;
+  logic         m1_axi_arvalid;
+  logic         m1_axi_arready;
+  logic         m1_axi_rready;
+  logic [3:0]   m1_axi_rid;
+  logic [31:0]  m1_axi_rdata;
+  logic [1:0]   m1_axi_rresp;
+  logic         m1_axi_rlast;
+  logic         m1_axi_rvalid;
+
+  logic [3:0]   m2_axi_awid;
+  logic [31:0]  m2_axi_awaddr;
+  logic [7:0]   m2_axi_awlen;
+  logic [2:0]   m2_axi_awsize;
+  logic [1:0]   m2_axi_awburst;
+  logic         m2_axi_awlock;
+  logic [3:0]   m2_axi_awcache;
+  logic [2:0]   m2_axi_awprot;
+  logic         m2_axi_awvalid;
+  logic         m2_axi_awready;
+  logic [31:0]  m2_axi_wdata;
+  logic [3:0]   m2_axi_wstrb;
+  logic         m2_axi_wlast;
+  logic         m2_axi_wvalid;
+  logic         m2_axi_wready;
+  logic         m2_axi_bready;
+  logic [3:0]   m2_axi_bid;
+  logic [1:0]   m2_axi_bresp;
+  logic         m2_axi_bvalid;
+  logic [3:0]   m2_axi_arid;
+  logic [31:0]  m2_axi_araddr;
+  logic [7:0]   m2_axi_arlen;
+  logic [2:0]   m2_axi_arsize;
+  logic [1:0]   m2_axi_arburst;
+  logic         m2_axi_arlock;
+  logic [3:0]   m2_axi_arcache;
+  logic [2:0]   m2_axi_arprot;
+  logic         m2_axi_arvalid;
+  logic         m2_axi_arready;
+  logic         m2_axi_rready;
+  logic [3:0]   m2_axi_rid;
+  logic [31:0]  m2_axi_rdata;
+  logic [1:0]   m2_axi_rresp;
+  logic         m2_axi_rlast;
+  logic         m2_axi_rvalid;
+
+
+  logic ui_clk, ui_rstn;
+
+
+
+  jtag_axi u_jtag_axi (
+    .aclk(ui_clk),                     // input wire aclk
+    .aresetn(ui_rstn),                 // input wire aresetn
+    .m_axi_awid(m2_axi_awid),        // output wire [3 : 0] m_axi_awid
+    .m_axi_awaddr(m2_axi_awaddr),    // output wire [31 : 0] m_axi_awaddr
+    .m_axi_awlen(m2_axi_awlen),      // output wire [7 : 0] m_axi_awlen
+    .m_axi_awsize(m2_axi_awsize),    // output wire [2 : 0] m_axi_awsize
+    .m_axi_awburst(m2_axi_awburst),  // output wire [1 : 0] m_axi_awburst
+    .m_axi_awlock(m2_axi_awlock),    // output wire m_axi_awlock
+    .m_axi_awcache(m2_axi_awcache),  // output wire [3 : 0] m_axi_awcache
+    .m_axi_awprot(m2_axi_awprot),    // output wire [2 : 0] m_axi_awprot
+    .m_axi_awqos(),                 // output wire [3 : 0] m_axi_awqos
+    .m_axi_awvalid(m2_axi_awvalid),  // output wire m_axi_awvalid
+    .m_axi_awready(m2_axi_awready),  // input wire m_axi_awready
+    .m_axi_wdata(m2_axi_wdata),      // output wire [31 : 0] m_axi_wdata
+    .m_axi_wstrb(m2_axi_wstrb),      // output wire [3 : 0] m_axi_wstrb
+    .m_axi_wlast(m2_axi_wlast),      // output wire m_axi_wlast
+    .m_axi_wvalid(m2_axi_wvalid),    // output wire m_axi_wvalid
+    .m_axi_wready(m2_axi_wready),    // input wire m_axi_wready
+    .m_axi_bid(m2_axi_bid),          // input wire [3 : 0] m_axi_bid
+    .m_axi_bresp(m2_axi_bresp),      // input wire [1 : 0] m_axi_bresp
+    .m_axi_bvalid(m2_axi_bvalid),    // input wire m_axi_bvalid
+    .m_axi_bready(m2_axi_bready),    // output wire m_axi_bready
+    .m_axi_arid(m2_axi_arid),        // output wire [3 : 0] m_axi_arid
+    .m_axi_araddr(m2_axi_araddr),    // output wire [31 : 0] m_axi_araddr
+    .m_axi_arlen(m2_axi_arlen),      // output wire [7 : 0] m_axi_arlen
+    .m_axi_arsize(m2_axi_arsize),    // output wire [2 : 0] m_axi_arsize
+    .m_axi_arburst(m2_axi_arburst),  // output wire [1 : 0] m_axi_arburst
+    .m_axi_arlock(m2_axi_arlock),    // output wire m_axi_arlock
+    .m_axi_arcache(m2_axi_arcache),  // output wire [3 : 0] m_axi_arcache
+    .m_axi_arprot(m2_axi_arprot),    // output wire [2 : 0] m_axi_arprot
+    .m_axi_arqos(),                 // output wire [3 : 0] m_axi_arqos
+    .m_axi_arvalid(m2_axi_arvalid),  // output wire m_axi_arvalid
+    .m_axi_arready(m2_axi_arready),  // input wire m_axi_arready
+    .m_axi_rid(m2_axi_rid),          // input wire [3 : 0] m_axi_rid
+    .m_axi_rdata(m2_axi_rdata),      // input wire [31 : 0] m_axi_rdata
+    .m_axi_rresp(m2_axi_rresp),      // input wire [1 : 0] m_axi_rresp
+    .m_axi_rlast(m2_axi_rlast),      // input wire m_axi_rlast
+    .m_axi_rvalid(m2_axi_rvalid),    // input wire m_axi_rvalid
+    .m_axi_rready(m2_axi_rready)     // output wire m_axi_rready
+  );
+
+  ddr_io u_ddr_io(
+    .ui_clk(ui_clk),
+    .ui_rstn(ui_rstn),
+    .ddr3_dq(ddr3_dq),
+    .ddr3_dqs_n(ddr3_dqs_n),
+    .ddr3_dqs_p(ddr3_dqs_p),
+    .ddr3_addr(ddr3_addr),
+    .ddr3_ba(ddr3_ba),
+    .ddr3_ras_n(ddr3_ras_n),
+    .ddr3_cas_n(ddr3_cas_n),
+    .ddr3_we_n(ddr3_we_n),
+    .ddr3_reset_n(ddr3_reset_n),
+    .ddr3_ck_p(ddr3_ck_p),
+    .ddr3_ck_n(ddr3_ck_n),
+    .ddr3_cke(ddr3_cke),
+    .ddr3_cs_n(ddr3_cs_n),
+    .ddr3_dm(ddr3_dm),
+    .ddr3_odt(ddr3_odt),
+    .sys_clk(sys_clk),
+    .sys_rstn(sys_rstn & !btn[0]),
+
+/*
+    .m_axi_awid(m2_axi_awid),
+    .m_axi_awaddr(m2_axi_awaddr),
+    .m_axi_awlen(m2_axi_awlen),
+    .m_axi_awsize(m2_axi_awsize),
+    .m_axi_awburst(m2_axi_awburst),
+    .m_axi_awlock(m2_axi_awlock),
+    .m_axi_awcache(m2_axi_awcache),
+    .m_axi_awprot(m2_axi_awprot),
+    .m_axi_awvalid(m2_axi_awvalid),
+    .m_axi_awready(m2_axi_awready),
+    .m_axi_wdata(m2_axi_wdata),
+    .m_axi_wstrb(m2_axi_wstrb),
+    .m_axi_wlast(m2_axi_wlast),
+    .m_axi_wvalid(m2_axi_wlast),
+    .m_axi_wready(m2_axi_wready),
+    .m_axi_bready(m2_axi_bready),
+    .m_axi_bid(m2_axi_bid),
+    .m_axi_bresp(m2_axi_bresp),
+    .m_axi_bvalid(m2_axi_bvalid),
+    .m_axi_arid(m2_axi_arid),
+    .m_axi_araddr(m2_axi_araddr),
+    .m_axi_arlen(m2_axi_arlen),
+    .m_axi_arsize(m2_axi_arsize),
+    .m_axi_arburst(m2_axi_arburst),
+    .m_axi_arlock(m2_axi_arlock),
+    .m_axi_arcache(m2_axi_arcache),
+    .m_axi_arprot(m2_axi_arprot),
+    .m_axi_arvalid(m2_axi_arvalid),
+    .m_axi_arready(m2_axi_arready),
+    .m_axi_rready(m2_axi_rready),
+    .m_axi_rid(m2_axi_rid),
+    .m_axi_rdata(m2_axi_rdata),
+    .m_axi_rresp(m2_axi_rresp),
+    .m_axi_rlast(m2_axi_rlast),
+    .m_axi_rvalid(m2_axi_rvalid)
+    */
+    .m_axi_awid(m_axi_awid),
+    .m_axi_awaddr(m_axi_awaddr),
+    .m_axi_awlen(m_axi_awlen),
+    .m_axi_awsize(m_axi_awsize),
+    .m_axi_awburst(m_axi_awburst),
+    .m_axi_awlock(m_axi_awlock),
+    .m_axi_awcache(m_axi_awcache),
+    .m_axi_awprot(m_axi_awprot),
+    .m_axi_awvalid(m_axi_awvalid),
+    .m_axi_awready(m_axi_awready),
+    .m_axi_wdata(m_axi_wdata),
+    .m_axi_wstrb(m_axi_wstrb),
+    .m_axi_wlast(m_axi_wlast),
+    .m_axi_wvalid(m_axi_wlast),
+    .m_axi_wready(m_axi_wready),
+    .m_axi_bready(m_axi_bready),
+    .m_axi_bid(m_axi_bid),
+    .m_axi_bresp(m_axi_bresp),
+    .m_axi_bvalid(m_axi_bvalid),
+    .m_axi_arid(m_axi_arid),
+    .m_axi_araddr(m_axi_araddr),
+    .m_axi_arlen(m_axi_arlen),
+    .m_axi_arsize(m_axi_arsize),
+    .m_axi_arburst(m_axi_arburst),
+    .m_axi_arlock(m_axi_arlock),
+    .m_axi_arcache(m_axi_arcache),
+    .m_axi_arprot(m_axi_arprot),
+    .m_axi_arvalid(m_axi_arvalid),
+    .m_axi_arready(m_axi_arready),
+    .m_axi_rready(m_axi_rready),
+    .m_axi_rid(m_axi_rid),
+    .m_axi_rdata(m_axi_rdata),
+    .m_axi_rresp(m_axi_rresp),
+    .m_axi_rlast(m_axi_rlast),
+    .m_axi_rvalid(m_axi_rvalid)
+  );
+
+
+    logic halt;
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+    mips_pipeline_sram_dmac_led #(FILENAME)
+      u_mips_sram_dmac_led(ui_clk, !ui_rstn | btn[1], 
+        halt,
+        led[2:0],
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+  assign led[3] = halt;
+
+
+  jtag_adapter u_jtag_adapter (
+    .clk(ui_clk),                     // input wire aclk
+    .reset(!ui_rstn),
+    .dramAddress(dramAddress), .dramWriteData(dramWriteData),
+    .readEnable(dramReadEnable), .writeEnable(dramWriteEnable),
+    .dramReadData(dramReadData),
+    .dramValid(dramValid),
+
+    .m_axi_awid(m1_axi_awid),        // output wire [3 : 0] m_axi_awid
+    .m_axi_awaddr(m1_axi_awaddr),    // output wire [31 : 0] m_axi_awaddr
+    .m_axi_awlen(m1_axi_awlen),      // output wire [7 : 0] m_axi_awlen
+    .m_axi_awsize(m1_axi_awsize),    // output wire [2 : 0] m_axi_awsize
+    .m_axi_awburst(m1_axi_awburst),  // output wire [1 : 0] m_axi_awburst
+    .m_axi_awlock(m1_axi_awlock),    // output wire m_axi_awlock
+    .m_axi_awcache(m1_axi_awcache),  // output wire [3 : 0] m_axi_awcache
+    .m_axi_awprot(m1_axi_awprot),    // output wire [2 : 0] m_axi_awprot
+    .m_axi_awvalid(m1_axi_awvalid),  // output wire m_axi_awvalid
+    .m_axi_awready(m1_axi_awready),  // input wire m_axi_awready
+    .m_axi_wdata(m1_axi_wdata),      // output wire [31 : 0] m_axi_wdata
+    .m_axi_wstrb(m1_axi_wstrb),      // output wire [3 : 0] m_axi_wstrb
+    .m_axi_wlast(m1_axi_wlast),      // output wire m_axi_wlast
+    .m_axi_wvalid(m1_axi_wvalid),    // output wire m_axi_wvalid
+    .m_axi_wready(m1_axi_wready),    // input wire m_axi_wready
+    .m_axi_bid(m1_axi_bid),          // input wire [3 : 0] m_axi_bid
+    .m_axi_bresp(m1_axi_bresp),      // input wire [1 : 0] m_axi_bresp
+    .m_axi_bvalid(m1_axi_bvalid),    // input wire m_axi_bvalid
+    .m_axi_bready(m1_axi_bready),    // output wire m_axi_bready
+    .m_axi_arid(m1_axi_arid),        // output wire [3 : 0] m_axi_arid
+    .m_axi_araddr(m1_axi_araddr),    // output wire [31 : 0] m_axi_araddr
+    .m_axi_arlen(m1_axi_arlen),      // output wire [7 : 0] m_axi_arlen
+    .m_axi_arsize(m1_axi_arsize),    // output wire [2 : 0] m_axi_arsize
+    .m_axi_arburst(m1_axi_arburst),  // output wire [1 : 0] m_axi_arburst
+    .m_axi_arlock(m1_axi_arlock),    // output wire m_axi_arlock
+    .m_axi_arcache(m1_axi_arcache),  // output wire [3 : 0] m_axi_arcache
+    .m_axi_arprot(m1_axi_arprot),    // output wire [2 : 0] m_axi_arprot
+    .m_axi_arvalid(m1_axi_arvalid),  // output wire m_axi_arvalid
+    .m_axi_arready(m1_axi_arready),  // input wire m_axi_arready
+    .m_axi_rid(m1_axi_rid),          // input wire [3 : 0] m_axi_rid
+    .m_axi_rdata(m1_axi_rdata),      // input wire [31 : 0] m_axi_rdata
+    .m_axi_rresp(m1_axi_rresp),      // input wire [1 : 0] m_axi_rresp
+    .m_axi_rlast(m1_axi_rlast),      // input wire m_axi_rlast
+    .m_axi_rvalid(m1_axi_rvalid),    // input wire m_axi_rvalid
+    .m_axi_rready(m1_axi_rready)     // output wire m_axi_rready
+  );
+
+// mux_axi u_mux_axi(1,
+mux_axi u_mux_axi(halt,
+   // axi1
+   m1_axi_awid,
+   m1_axi_awaddr,
+   m1_axi_awlen,
+   m1_axi_awsize,
+   m1_axi_awburst,
+   m1_axi_awlock,
+   m1_axi_awcache,
+   m1_axi_awprot,
+   m1_axi_awvalid,
+   m1_axi_awready,
+   m1_axi_wdata,
+   m1_axi_wstrb,
+   m1_axi_wlast,
+   m1_axi_wvalid,
+   m1_axi_wready,
+   m1_axi_bready,
+   m1_axi_bid,
+   m1_axi_bresp,
+   m1_axi_bvalid,
+   m1_axi_arid,
+   m1_axi_araddr,
+   m1_axi_arlen,
+   m1_axi_arsize,
+   m1_axi_arburst,
+   m1_axi_arlock,
+   m1_axi_arcache,
+   m1_axi_arprot,
+   m1_axi_arvalid,
+   m1_axi_arready,
+   m1_axi_rready,
+   m1_axi_rid,
+   m1_axi_rdata,
+   m1_axi_rresp,
+   m1_axi_rlast,
+   m1_axi_rvalid,
+
+  // axi2
+  m2_axi_awid,
+  m2_axi_awaddr,
+  m2_axi_awlen,
+  m2_axi_awsize,
+  m2_axi_awburst,
+  m2_axi_awlock,
+  m2_axi_awcache,
+  m2_axi_awprot,
+  m2_axi_awvalid,
+  m2_axi_awready,
+  m2_axi_wdata,
+  m2_axi_wstrb,
+  m2_axi_wlast,
+  m2_axi_wvalid,
+  m2_axi_wready,
+  m2_axi_bready,
+  m2_axi_bid,
+  m2_axi_bresp,
+  m2_axi_bvalid,
+  m2_axi_arid,
+  m2_axi_araddr,
+  m2_axi_arlen,
+  m2_axi_arsize,
+  m2_axi_arburst,
+  m2_axi_arlock,
+  m2_axi_arcache,
+  m2_axi_arprot,
+  m2_axi_arvalid,
+  m2_axi_arready,
+  m2_axi_rready,
+  m2_axi_rid,
+  m2_axi_rdata,
+  m2_axi_rresp,
+  m2_axi_rlast,
+  m2_axi_rvalid,
+
+  // output
+  m_axi_awid,
+  m_axi_awaddr,
+  m_axi_awlen,
+  m_axi_awsize,
+  m_axi_awburst,
+  m_axi_awlock,
+  m_axi_awcache,
+  m_axi_awprot,
+  m_axi_awvalid,
+  m_axi_awready,
+  m_axi_wdata,
+  m_axi_wstrb,
+  m_axi_wlast,
+  m_axi_wvalid,
+  m_axi_wready,
+  m_axi_bid,
+  m_axi_bresp,
+  m_axi_bvalid,
+  m_axi_bready,
+  m_axi_arid,
+  m_axi_araddr,
+  m_axi_arlen,
+  m_axi_arsize,
+  m_axi_arburst,
+  m_axi_arlock,
+  m_axi_arcache,
+  m_axi_arprot,
+  m_axi_arvalid,
+  m_axi_arready,
+  m_axi_rid,
+  m_axi_rdata,
+  m_axi_rresp,
+  m_axi_rlast,
+  m_axi_rvalid,
+  m_axi_rready);
+
+endmodule
