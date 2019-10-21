@@ -751,3 +751,138 @@ module testbench_d2s_simple(
     end
     
 endmodule
+
+module testbench_d2s_simple_writeback(
+    );
+    logic clk, reset;
+
+    logic halt;
+    logic [2:0] ledval; 
+    logic dramWriteEnable, dramReadEnable, dramValid;
+    logic [31:0] dramAddress, dramWriteData, dramReadData;
+
+    /*
+    // assume in DDR,
+    // 0: 0000ffff
+    // 4: 0
+    // 8: 1
+    // C: XXXXXX
+
+*/
+    mips_pipeline_sram_dmac_led #("d2s_simple_writeback_test.mem")
+      dut(clk, reset, 
+        halt,
+        ledval,
+        dramAddress, dramWriteData,
+        dramWriteEnable, dramReadEnable,
+        dramReadData,
+        dramValid
+    );
+
+    initial begin
+        dramValid = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        repeat(10)
+            begin
+                clk = 0; #10; clk = 1; #10; 
+            end
+        // $display("deb1, %h", dmaDstAddress);
+        assert(dramReadEnable) else $error("DRAM read not invoked.");
+        assert(dramAddress === 0) else $error("DRAM read address is wrong. %h", dramAddress);
+
+        dramReadData = 32'h0000ffff;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(10)
+            begin
+                clk = 0; #10; clk = 1; #10; 
+            end
+        assert(dramAddress === 4);
+
+        dramReadData = 0;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(10)
+            begin
+                clk = 0; #10; clk = 1; #10; 
+            end
+        assert(dramAddress === 8);
+
+        dramReadData = 1;
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(10)
+            begin
+                clk = 0; #10; clk = 1; #10; 
+            end
+
+        assert(dramAddress === 12);
+        dramReadData = 5555; // whatever.
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(30)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+
+        assert(dramWriteEnable) else $error("DRAM write not invoked.");
+        assert(dramAddress === 32'h10) else $error("DRAM write address is wrong. %h", dramAddress);
+        assert(dramWriteData === 32'h0000ffff) else $error("write data is wrong %h", dramWriteData);
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramWriteEnable) else $error("DRAM write2 not invoked.");
+        assert(dramAddress === 32'h14) else $error("DRAM write2 address is wrong. %h", dramAddress);
+        assert(dramWriteData === 0) else $error("write2 data is wrong %h", dramWriteData);
+
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramWriteEnable) else $error("DRAM write3 not invoked.");
+        assert(dramAddress === 32'h18) else $error("DRAM write3 address is wrong. %h", dramAddress);
+        assert(dramWriteData === 32'h1) else $error("write3 data is wrong %h", dramWriteData);
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dramAddress === 32'h1C) else $error("DRAM write4 address is wrong. %h", dramAddress);
+        // We do not care forth data.
+
+        dramValid = 1;
+        clk = 0; #10; clk = 1; #10; 
+        dramValid = 0;
+                repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(ledval === 3'b111) else $error("ledval wrong, %b", ledval);
+        assert(halt) else $error("not halted %b", halt);
+        $display("d2s_simple writeback test done");
+    end
+    
+endmodule

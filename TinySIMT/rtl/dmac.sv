@@ -215,6 +215,8 @@ module dma_ctrl(input logic clk, reset,
     assign dramWriteEnable = (state == S2D_WRITE_REQUEST);
     assign sramWriteEnable = (state == D2S_WRITE);
     assign dramReadEnable = (state == D2S_READ_REQUEST);
+
+    // sramReadData comming 1 clock after. But this must be OK.
     assign dramWriteData = sramReadData;
 
     // assign nextstate = (cmd == 2'b01) ? D2S_BEGIN: DORMANT;

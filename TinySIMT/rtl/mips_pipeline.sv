@@ -95,35 +95,57 @@ module fetch_stage #(parameter FILENAME="romdata.mem")
              input logic [1:0] pcSrc,
                 input logic [31:0] pcBranch, pcJump,
                 output logic [31:0] pcPlus4, instr);
-    logic [31:0] pc, newPC, instrRead;
+    logic [31:0] pc, pcCand, /* newPC, */ instrRead, pcBranchCur, pcJumpCur;
+    logic [1:0] pcSrcCur;
 
-    flopr Pcflop(clk, reset, !Stall, newPC, pc);
-    romcode #(FILENAME) InstRom(pc[15:2], instrRead);    
+    // flopr Pcflop(clk, reset, !Stall, newPC, pcCand);
+    romcode #(FILENAME) InstRom(pc[15:2], instrRead);
+
+    always_ff @(posedge clk, posedge reset)
+        if(reset) begin
+            pcCand <=  32'h0040_0000; // PC reset address.
+            pcSrcCur = 2'b0;
+            pcBranchCur = 32'b0;
+            pcJumpCur = 32'b0;
+        end
+        else if(!Stall) begin
+            pcCand <= pcPlus4;
+            pcSrcCur <= pcSrc;
+            pcBranchCur = pcBranch;
+            pcJumpCur = pcJump;
+        end
+
+
+
+    assign pc = (pcSrcCur == 2'b01) ? pcBranchCur : ((pcSrcCur == 2'b10) ? pcJumpCur : pcCand);    
     assign pcPlus4 = pc+4;
-
     assign instr = Halt ? 32'b0 : instrRead;
-    
+
     /*
     always @(posedge clk)
-        $display("instr %h, pc=%h, newPC=%h, Stall=%b", instr, pc, newPC, Stall);
-        */
+        $display("instr %h, pc=%h, pcSrcCurC=%b, Stall=%b", instr, pc, pcSrcCur, Stall);
+    */
 
-    assign newPC = (pcSrc == 2'b01) ? pcBranch:  ((pcSrc == 2'b10) ? pcJump : pcPlus4);
+    // assign newPC = (pcSrc == 2'b01) ? pcBranch:  ((pcSrc == 2'b10) ? pcJump : pcPlus4);
 
 endmodule
 
-module fetch2decode(input logic clk, reset, stall, isBranch,
+module fetch2decode(input logic clk, reset, stall, 
+             input logic [1:0] pcSrcD,
              input logic [31:0] instrF, pcF,
+             output logic [1:0] pcSrcDNext,
              output logic [31:0] instrD, pcD);
     always_ff @(posedge clk, posedge reset)
-        if(reset | isBranch) begin
+        if(reset) begin
                 pcD <= 32'h0040_0000; // PC reset address.
                 instrD <= 0;
+                pcSrcDNext <= 0;
             end
         else if(!stall)
             begin
                 instrD <= instrF;
                 pcD <= pcF;
+                pcSrcDNext <= pcSrcD;
             end 
 endmodule
 
@@ -187,42 +209,37 @@ endmodule
 
 module exec_stage(input logic clk, reset, ALUSrc,
                 input logic [2:0] ALUCtrl,
-                input logic ImmtoReg, 
-                input logic [31:0] regData1, regData2, immExtend, 
+                input logic [31:0] regData1, regData2, immExtend,
                 output logic zero,
                 output logic [31:0] aluRes, memWriteData);
-    logic [31:0] srcB, aluRes1;
+    logic [31:0] srcB;
     
     assign memWriteData = regData2;
 
     /*
     always @(posedge clk)
         begin
-            $display("exec: regData1=%h, regData2=%h, srcB=%h, ALUCtrl=%b, immExtend=%h, aluRes=%h, ImmtoReg=%b",
-                        regData1, regData2, srcB, ALUCtrl, immExtend, aluRes, ImmtoReg);
+            $display("exec: regData1=%h, regData2=%h, srcB=%h, ALUCtrl=%b, aluRes=%h",
+                        regData1, regData2, srcB, ALUCtrl, aluRes);
         end
-        */
-    
+    */
     
     mux2 MuxSrcB(regData2, immExtend, ALUSrc, srcB); 
     
     logic cout;
-    alu Alu(regData1, srcB, ALUCtrl, cout, zero, aluRes1);
-
-    assign aluRes = ImmtoReg ?  {immExtend[15:0], 16'b0} : aluRes1;
-
+    alu Alu(regData1, srcB, ALUCtrl, cout, zero, aluRes);
 endmodule
 
 module exec2mem(input logic clk, reset, stall, zeroE,
             input logic [31:0] aluResE, memWriteDataE, immExtendE,
                 regData1E, regData2E,
             input logic [4:0] regWriteAddrE, 
-            input logic [5:0]  ctrlE,
+            input logic [6:0]  ctrlE,
             output logic zeroM,
             output logic [31:0] aluResM, memWriteDataM, immExtendM,
                 regData1M, regData2M,
             output logic [4:0]  regWriteAddrM,
-            output logic [5:0]  ctrlM);
+            output logic [6:0]  ctrlM);
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
                 zeroM <= 0;
@@ -342,7 +359,7 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     logic ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE;
 
     logic [4:0] regWriteAddrD, regWriteAddrE, regWriteAddrM, regWriteAddrW;
-    logic [31:0] pcPlus4F, instrF, pcPlus4D, instrD,
+    logic [31:0] pcPlus4F, instrF, pcPlus4D, instrD, pcPlus4DCand, instrDCand,
                 regData1D, regData2D, immExtendD,                
                 regData1E, regData2E, regData1EDash, regData2EDash, immExtendE, 
                 regData1M, regData2M, immExtendM;
@@ -360,12 +377,12 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     
     logic [1:0] ForwardAE, ForwardBE;
     logic [4:0] regRsE, regRtE;
-    logic [1:0] pcSrcD;
+    logic [1:0] pcSrcD, pcSrcDNext;
     logic ForwardAD, ForwardBD;
     logic [31:0] pcBranchD, pcJumpD;                     
 
     logic halting, HaltD, HaltE, HaltM, HaltW;
-    logic ImmtoRegD, ImmtoRegE;
+    logic ImmtoRegD, ImmtoRegE, ImmtoRegM;
     logic IsZeroImmD;
     logic [1:0] DmaCmdD, DmaCmdE, DmaCmdM;
     // regData1, regReadData2, immExtend
@@ -421,9 +438,10 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
               ForwardAD, ForwardBD,
               StallF, StallD, FlushE);
     fetch_stage #(FILENAME) FetchStage(clk, reset, StallF|dmaStall, halting, pcSrcD, pcBranchD, pcJumpD, pcPlus4F, instrF);
-    fetch2decode Fetch2Decode(clk, reset, StallD | dmaStall, pcSrcD[0] | pcSrcD[1], instrF, pcPlus4F, instrD, pcPlus4D);
+    fetch2decode Fetch2Decode(clk, reset, StallD | dmaStall, pcSrcD, instrF, pcPlus4F, pcSrcDNext, instrDCand, pcPlus4DCand);
 
-    
+    assign instrD = (pcSrcDNext[0] | pcSrcDNext[1]) ? 0 : instrDCand;
+    assign pcPlus4D =  (pcSrcDNext[0] | pcSrcDNext[1]) ? 32'h0040_0000 : pcPlus4DCand;
 
     always_ff @(posedge clk, posedge reset)
         if(reset)
@@ -451,13 +469,14 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
     assign regData2EDash = (ForwardBE == 2'b10) ? aluResM : ((ForwardBE == 2'b01) ? regWriteDataW : regData2E);
 
 
-    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, ImmtoRegE, regData1EDash, regData2EDash, immExtendE, 
+    // immExtend, ImmtoReg.
+    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, regData1EDash, regData2EDash, immExtendE,
                          zeroE, aluResE, memWriteDataE);
     exec2mem Exec2Mem(clk, reset, dmaStall, zeroE, aluResE,
                         memWriteDataE, immExtendE, regData1EDash, regData2EDash, regWriteAddrE, 
-                        {MemWriteEnableE,  RegWriteEnableE, MemtoRegE, HaltE, DmaCmdE},
+                        {MemWriteEnableE,  RegWriteEnableE, MemtoRegE, HaltE, DmaCmdE, ImmtoRegE},
                         zeroM, aluResM,  memWriteDataM, immExtendM, regData1M, regData2M, regWriteAddrM,
-                        {MemWriteEnableM, RegWriteEnableM, MemtoRegM, HaltM, DmaCmdM});
+                        {MemWriteEnableM, RegWriteEnableM, MemtoRegM, HaltM, DmaCmdM, ImmtoRegM});
 
     /*
         mem_stage MemStage(clk, reset, MemWriteEnableM,
@@ -465,7 +484,10 @@ module mips_pipeline #(parameter FILENAME="mipstest.mem") (
         MemStage now go outside of CPU.
     */    
     assign sramWriteEnable = MemWriteEnableM;
-    assign sramDataAddress = aluResM;
+
+    //        assign aluRes = ImmtoReg ?  {immExtend[15:0], 16'b0} : aluRes1;
+
+    assign sramDataAddress = ImmtoRegM? {immExtendM[15:0], 16'b0} : aluResM;
     assign sramWriteData = memWriteDataM;
     assign memReadDataM = sramReadData;
 
@@ -505,11 +527,11 @@ module mips_pipeline_sram_dmac_led #(parameter FILENAME="romdata.mem")
         input logic dramValid
     );
 
-    logic [31:0] sramReadData, sramWriteData, dmaSrcAddress, dmaDstAddress;
+    logic [31:0] sramReadData, sramReadDataBuf, sramWriteData, dmaSrcAddress, dmaDstAddress;
     logic [13:0] sramAddress, sramAddressForDMAC;
     logic [31:0] sramReadDataForCPU, sramAddressForCPU, sramWriteDataForCPU;
     logic sramWriteEnableForCPU;
-    logic [31:0] sramReadDataForDMAC, sramWriteDataForDMAC;
+    logic [31:0] sramWriteDataForDMAC;
     logic sramWriteEnableForDMAC;
 
     logic sramWriteEnable, stall;
@@ -521,7 +543,7 @@ module mips_pipeline_sram_dmac_led #(parameter FILENAME="romdata.mem")
                                         dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
 
     dma_ctrl u_dmac(clk, reset, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth,
-                sramReadDataForDMAC, dramReadData,
+                sramReadDataBuf, dramReadData,
                 sramAddressForDMAC, sramWriteDataForDMAC, sramWriteEnableForDMAC,
                 dramAddress, dramWriteData, dramWriteEnable, dramReadEnable,
                 dramValid, stall);
@@ -534,13 +556,20 @@ module mips_pipeline_sram_dmac_led #(parameter FILENAME="romdata.mem")
     */
     always_ff @(posedge clk, posedge reset)
         if(reset)
-            led <= 3'b0;
-        else if(sramWriteEnableForCPU & sramAddressForCPU[31])
-            case(sramAddressForCPU[3:0])
-                4'b0: led[0] <= sramWriteDataForCPU[0];
-                4'b100: led[1] <= sramWriteDataForCPU[0];
-                4'b1000: led[2] <= sramWriteDataForCPU[0];
-            endcase
+            begin   
+                led <= 3'b0;
+                sramReadDataBuf <= 32'b0;
+            end
+        else
+            begin
+                sramReadDataBuf <= sramReadData;
+                if(sramWriteEnableForCPU & sramAddressForCPU[31])
+                    case(sramAddressForCPU[3:0])
+                        4'b0: led[0] <= sramWriteDataForCPU[0];
+                        4'b100: led[1] <= sramWriteDataForCPU[0];
+                        4'b1000: led[2] <= sramWriteDataForCPU[0];
+                    endcase
+            end
 
   always_comb
     if(stall)
@@ -548,12 +577,10 @@ module mips_pipeline_sram_dmac_led #(parameter FILENAME="romdata.mem")
         sramAddress = sramAddressForDMAC;
         sramWriteEnable = sramWriteEnableForDMAC;
         sramWriteData = sramWriteDataForDMAC;
-        sramReadDataForDMAC = sramReadData;
         sramReadDataForCPU = 32'b0;        
       end
     else
       begin
-        sramReadDataForDMAC = 32'b0;
         if(sramAddressForCPU[31])
             begin
                 sramAddress = 14'b0;
