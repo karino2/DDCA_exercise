@@ -1,6 +1,8 @@
 set dev 0
-set bit "output/arty_top.bit"
-set ltx "output/arty_top.ltx"
+# set bit "output/arty_top.bit"
+# set ltx "output/arty_top.ltx"
+set bit "output/arty_top_pipeline.bit"
+set ltx "output/arty_top_pipeline.ltx"
 
 open_hw
 connect_hw_server
