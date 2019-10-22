@@ -295,3 +295,65 @@ module testbench_simt_beq_backward();
         assert(dut.DataMem.BANK3[0] === 1) else $error("wrong fourth data: %h", dut.DataMem.BANK3[0]);
     end
 endmodule
+
+
+module testbench_luiori(
+    );
+    logic clk, reset;
+
+    logic halt;
+
+    simt_with_sram #("luiori_test.mem") dut(clk, reset, halt);
+                     
+    initial begin
+        clk = 0; reset = 1; #10; reset = 0; clk = 1; #10;
+
+        repeat(30)
+            begin
+                clk = 0; #10; clk = 1; #10; 
+            end
+        assert(dut.u_cpus.core1.DecodeStage.RegFile.regs[1] === 32'h04d2162e) else $error("fail lui ori, %h", dut.u_cpus.core1.DecodeStage.RegFile.regs[1]);
+        $display("mips lui ori test done");
+    end
+    
+endmodule
+
+
+module testbench_ori_unsigned(
+    );
+    logic clk, reset;
+
+    logic halt;
+
+    simt_with_sram #("ori_unsigned.mem") dut(clk, reset, halt);
+                     
+    initial begin
+        clk = 0; reset = 1; #10; reset = 0; clk = 1; #10;
+
+        repeat(30)
+            begin
+                clk = 0; #10; clk = 1; #10; 
+            end
+        assert(dut.u_cpus.core1.DecodeStage.RegFile.regs[1] === 32'h0000ffff) else $error("fail ori unsigned, %h", dut.u_cpus.core1.DecodeStage.RegFile.regs[1]);
+        $display("ori unsigned test done");
+    end
+    
+endmodule
+
+
+module testbench_simt_srl_andi();
+    logic clk, reset, halt;
+
+    simt_with_sram #("srl_andi.mem") dut(clk, reset, halt);
+
+    initial begin
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+        repeat(20)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dut.u_cpus.core1.DecodeStage.RegFile.regs[2] === 32'h3f) else $error("wrong reg[2], %h", dut.u_cpus.core1.DecodeStage.RegFile.regs[2]);
+    end
+endmodule

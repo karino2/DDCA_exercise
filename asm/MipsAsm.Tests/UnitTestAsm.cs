@@ -49,6 +49,13 @@ namespace MipsAsm.Tests
         }
 
         [Test]
+        public void TestAndi()
+        {
+            var actual = target.AsmOne("andi $2, $0, 5");
+            Assert.AreEqual("30020005", actual);
+        }
+
+        [Test]
         public void TestLui()
         {
             // 0011 11_00 000_0 0010 0 0 0101 0000  
@@ -104,6 +111,16 @@ namespace MipsAsm.Tests
             var actual = target.AsmOne("sll $4, $3, 5");
             // 0000 00_00 000_0 0011 0010 0_001 01_00 0000
             Assert.AreEqual("00032140", actual);
+        }
+
+        [Test]
+        public void TestSrl()
+        {
+            // op(6), rs(5), rt, rd, shamt(5), funct(6)
+            // slr rd, rt, shamt
+            var actual = target.AsmOne("srl $4, $3, 5");
+            // 0000 00_00 000_0 0011 0010 0_001 01_00 0010
+            Assert.AreEqual("00032142", actual);
         }
 
         [Test]

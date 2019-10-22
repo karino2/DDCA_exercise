@@ -61,6 +61,11 @@ namespace MipsAsm
 
         private string AsmSll(List<string> args)
         {
+            return AsmShift(args, 0);
+        }
+
+        private string AsmShift(List<string> args, uint funct)
+        {
             /*
             // op(6), rs(5), rt, rd, shamt(5), funct(6)
             // sll rd, rt, shamt
@@ -71,6 +76,7 @@ namespace MipsAsm
             word += RegstrToRegnum(args[0]) << 11;
             word += RegstrToRegnum(args[1]) << 16;
             word += (0xffff & (uint)int.Parse(args[2])) << 6;
+            word |= funct;
             return String.Format("{0:x8}", word);
         }
 
@@ -129,6 +135,10 @@ namespace MipsAsm
             {
                 return AsmSll(args);
             }
+            if("srl" == op)
+            {
+                return AsmShift(args, 2);
+            }
             if("beq" == op)
             {
                 return AsmBeq(args);
@@ -141,6 +151,9 @@ namespace MipsAsm
             }
             if("ori" == op) {
                 return AsmI(args, 13);
+            }
+            if("andi" == op) {
+                return AsmI(args, 12);
             }
             if("sw" == op)
             {

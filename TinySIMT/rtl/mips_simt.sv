@@ -29,9 +29,12 @@ module minPC(input logic [31:0] pc0, pc1, pc2, pc3,
 endmodule
 
 
+//  ShiftCtrl:
+// 2'b01: sll
+// 2'b10: srl
 module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct, 
     output logic RegWrite, output logic RegDst, output logic IsZeroImm,  output logic ALUSrc, output logic Branch, 
-    output logic MemWrite, output logic MemtoReg, output logic ImmtoReg, output logic [3:0] ALUCtrl, output logic Jump, output logic Halt,
+    output logic MemWrite, output logic MemtoReg, output logic ImmtoReg, output logic [3:0] ALUCtrl, output logic [1:0] ShiftCtrl, output logic Jump, output logic Halt,
     output logic [1:0] DmaCmd //00: nothing  01: d2s   02:s2d 
     );
     
@@ -40,10 +43,12 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
                       | (Opcode == 6'b001000) // addi
                       | (Opcode == 6'b001010) // muli
                     | (Opcode == 6'b001111) // lui
+                      | (Opcode == 6'b001100) // andi
                     | (Opcode==6'b001101)); // ori
     assign RegDst = Opcode == 0;
     
-    assign IsZeroImm = (Opcode==6'b001101); // ori
+    assign IsZeroImm = (Opcode==6'b001101) // ori
+                      |(Opcode==6'b001100) ;  // andi
 
     assign ALUSrc = ((Opcode != 0) &
                      (Opcode != 6'b000100)); //beq
@@ -53,10 +58,22 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
     assign ImmtoReg = Opcode == 6'b001111; // lui
 
     always_comb
+        if(Opcode == 6'b0)
+            case(Funct)
+                6'b0: ShiftCtrl = 2'b01; // sll
+                6'b00010: ShiftCtrl = 2'b10; // srl
+                default ShiftCtrl = 2'b0;
+            endcase
+        else
+            ShiftCtrl = 2'b0;
+
+    always_comb
         if(Opcode == 6'b000100)
             ALUCtrl = 4'b0110;
         else if(Opcode == 6'b001101) // ori
             ALUCtrl = 4'b0001;
+        else if(Opcode == 6'b001100) // andi
+            ALUCtrl = 4'b0000;
         else if(Opcode == 6'b001010) // muli
             ALUCtrl = 4'b1000;
         else if(Opcode==6'b0)
@@ -203,6 +220,7 @@ module decode_stage #(parameter TID=0)(input logic clk, reset, regWriteEnable,
             input logic [31:0] regWriteData, pcPlus4, aluResM,
             input logic ForwardAD, ForwardBD,
             output logic [31:0] regReadData1, regReadData2, immExtend,
+            output logic [4:0] shamt,
             output logic [4:0] outRegWriteAddr,
             output logic isBranch,
             output logic [31:0] pcBranch, pcJump);
@@ -219,18 +237,21 @@ module decode_stage #(parameter TID=0)(input logic clk, reset, regWriteEnable,
     assign isBranch = BranchD & (eqLeft == eqRight);
     assign pcBranch = {immExtend[29:0], 2'b00}+pcPlus4;
     assign pcJump = {pcPlus4[31:28], instr[25:0], 2'b00};
+    assign shamt = instr[10:6];
 endmodule
 
 
 module decode2exec(input logic clk, reset, flush, stall,
             input logic [31:0] regData1D, regData2D,  
-                    immExtendD, 
+                    immExtendD,
+            input logic [4:0] shamtD,
             input logic [4:0] regWriteAddrD, regRsD, regRtD,
-            input logic [11:0]  ctrlD,
+            input logic [13:0]  ctrlD,
             output logic [31:0] regData1E, regData2E, 
                     immExtendE, 
+            output logic [4:0] shamtE,
             output logic [4:0] regWriteAddrE, regRsE, regRtE,
-            output logic [11:0] ctrlE);
+            output logic [13:0] ctrlE);
     always_ff @(posedge clk, posedge reset)
         if(reset | flush) begin
                 regData1E <= 0;
@@ -239,6 +260,7 @@ module decode2exec(input logic clk, reset, flush, stall,
                 regWriteAddrE <= 0; 
                 regRsE <= 0;
                 regRtE <= 0;
+                shamtE <= 0;
                 ctrlE <= 0; // ctrl should mean nop if everything is false.
             end
         else if(!stall)
@@ -250,16 +272,19 @@ module decode2exec(input logic clk, reset, flush, stall,
                 regRsE <= regRsD;
                 regRtE <= regRtD;
                 ctrlE <= ctrlD;
+                shamtE <= shamtD;
             end 
 endmodule
 
 
 module exec_stage(input logic clk, reset, ALUSrc,
                 input logic [3:0] ALUCtrl,
+                input logic [1:0] ShiftCtrl,
                 input logic [31:0] regData1, regData2, immExtend,
+                input logic [4:0] shamt,
                 output logic zero,
                 output logic [31:0] aluRes, memWriteData);
-    logic [31:0] srcB;
+    logic [31:0] srcB, aluRes1;
     
     assign memWriteData = regData2;
 
@@ -269,12 +294,24 @@ module exec_stage(input logic clk, reset, ALUSrc,
             $display("exec: regData1=%h, regData2=%h, srcB=%h, ALUCtrl=%b, aluRes=%h",
                         regData1, regData2, srcB, ALUCtrl, aluRes);
         end
-    */
+        */
     
     mux2 MuxSrcB(regData2, immExtend, ALUSrc, srcB); 
     
     logic cout;
-    alu2 Alu(regData1, srcB, ALUCtrl, cout, zero, aluRes);
+    alu2 Alu(regData1, srcB, ALUCtrl, cout, zero, aluRes1);
+
+    /*
+    //  ShiftCtrl:
+    // 2'b01: sll
+    // 2'b10: srl
+    */
+    always_comb
+        case(ShiftCtrl)
+            2'b01: aluRes = regData2 << shamt;
+            2'b10: aluRes = regData2 >> shamt;
+            default aluRes = aluRes1;
+        endcase
 endmodule
 
 module exec2mem(input logic clk, reset, stall, zeroE,
@@ -402,6 +439,7 @@ module simt_core #(parameter TID=0) (
     );
     logic RegWriteEnableD, RegDstD, ALUSrcD, BranchD, MemWriteEnableD, MemtoRegD, JumpD;
     logic [3:0] ALUCtrlD, ALUCtrlE;
+    logic [1:0] ShiftCtrlD, ShiftCtrlE;
 
     logic RegWriteEnableW, MemtoRegW;
     logic MemWriteEnableM, RegWriteEnableM, MemtoRegM;
@@ -416,11 +454,12 @@ module simt_core #(parameter TID=0) (
 
 
     logic [31:0] memWriteDataE, memWriteDataM;
-    logic [31:0] aluResE, aluResM;
+    logic [31:0] aluResE, aluResM, aluResMCand;
     logic zeroE;
     logic zeroM;
     logic [31:0] memReadDataM;
     logic [31:0] aluResW, memReadDataW, regWriteDataW;
+    logic [4:0] shamtD, shamtE;
     
     logic StallF, StallD, FlushE;
     logic execOtherCoreF;
@@ -510,34 +549,34 @@ module simt_core #(parameter TID=0) (
             halt <= 1'b0;
         else if(HaltW)
             halt <= 1'b1;
-
     ctrlunit CtrlUnit(instrD[31:26], instrD[5:0], RegWriteEnableD, RegDstD, IsZeroImmD, ALUSrcD, BranchD, MemWriteEnableD,
-                     MemtoRegD, ImmtoRegD, ALUCtrlD, JumpD, HaltD, DmaCmdD);
+                     MemtoRegD, ImmtoRegD, ALUCtrlD,ShiftCtrlD,  JumpD, HaltD, DmaCmdD);
                      
     decode_stage #(TID) DecodeStage(clk, reset, RegWriteEnableW, RegDstD, BranchD, IsZeroImmD, instrD, regWriteAddrW, regWriteDataW,
                           pcPlus4D, aluResM, ForwardAD, ForwardBD,
-                             regData1D , regData2D, immExtendD, regWriteAddrD, pcSrcD[0], pcBranchD, pcJumpD);
+                             regData1D , regData2D, immExtendD, shamtD, regWriteAddrD, pcSrcD[0], pcBranchD, pcJumpD);
     assign pcSrcD[1] = JumpD;
-    decode2exec Decode2Exec(clk, reset, FlushE & !dmaStall, dmaStall, regData1D, regData2D, immExtendD,
+    decode2exec Decode2Exec(clk, reset, FlushE & !dmaStall, dmaStall, regData1D, regData2D, immExtendD, shamtD,
                              regWriteAddrD, instrD[25:21], instrD[20:16],
-                            {ALUCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD, HaltD, ImmtoRegD, DmaCmdD},
-                             regData1E, regData2E, immExtendE,
+                            {ALUCtrlD, ShiftCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD, HaltD, ImmtoRegD, DmaCmdD},
+                             regData1E, regData2E, immExtendE, shamtE,
                               regWriteAddrE, regRsE, regRtE,
-                            {ALUCtrlE, ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE, HaltE, ImmtoRegE, DmaCmdE});
+                            {ALUCtrlE, ShiftCtrlE, ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE, HaltE, ImmtoRegE, DmaCmdE});
 
     
     // resolve forwarding for exec_stage. we also use this value to d2s and s2d, so calculate outside of stage module.
+
     assign regData1EDash = (ForwardAE == 2'b10) ? aluResM : ((ForwardAE == 2'b01) ? regWriteDataW : regData1E);
     assign regData2EDash = (ForwardBE == 2'b10) ? aluResM : ((ForwardBE == 2'b01) ? regWriteDataW : regData2E);
 
 
     // immExtend, ImmtoReg.
-    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, regData1EDash, regData2EDash, immExtendE,
+    exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, ShiftCtrlE, regData1EDash, regData2EDash, immExtendE, shamtE,
                          zeroE, aluResE, memWriteDataE);
     exec2mem Exec2Mem(clk, reset, dmaStall, zeroE, aluResE,
                         memWriteDataE, immExtendE, regData1EDash, regData2EDash, regWriteAddrE, 
                         {MemWriteEnableE,  RegWriteEnableE, MemtoRegE, HaltE, DmaCmdE, ImmtoRegE},
-                        zeroM, aluResM,  memWriteDataM, immExtendM, regData1M, regData2M, regWriteAddrM,
+                        zeroM, aluResMCand,  memWriteDataM, immExtendM, regData1M, regData2M, regWriteAddrM,
                         {MemWriteEnableM, RegWriteEnableM, MemtoRegM, HaltM, DmaCmdM, ImmtoRegM});
 
     /*
@@ -547,9 +586,9 @@ module simt_core #(parameter TID=0) (
     */    
     assign sramWriteEnable = MemWriteEnableM;
 
-    //        assign aluRes = ImmtoReg ?  {immExtend[15:0], 16'b0} : aluRes1;
+    assign aluResM = ImmtoRegM? {immExtendM[15:0], 16'b0} : aluResMCand;
 
-    assign sramDataAddress = ImmtoRegM? {immExtendM[15:0], 16'b0} : aluResM;
+    assign sramDataAddress = aluResM;
     assign sramWriteData = memWriteDataM;
     assign memReadDataM = sramReadData;
 
@@ -571,7 +610,9 @@ module simt_core #(parameter TID=0) (
             end
 
 
-    mem2writeback Mem2WriteBack(clk, reset, dmaStall, aluResM, memReadDataM,  regWriteAddrM,
+    mem2writeback Mem2WriteBack(clk, reset, dmaStall,
+                         ImmtoRegM? {immExtendM[15:0], 16'b0} : aluResM,
+                         memReadDataM,  regWriteAddrM,
                         {RegWriteEnableM, MemtoRegM, HaltM},
                         aluResW, memReadDataW, regWriteAddrW,
                         {RegWriteEnableW, MemtoRegW, HaltW});
