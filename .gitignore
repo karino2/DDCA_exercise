@@ -8,3 +8,4 @@ TinySIMT/sim/03_mips_pipeline/xsim.dir/
 *.pb
 asm/asm_files/*.mem
 TinySIMT/sim/04_pipeline_ddr/xsim.dir/
+TinySIMT/sim/05_simt/xsim.dir/

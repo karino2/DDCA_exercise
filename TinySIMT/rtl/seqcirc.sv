@@ -114,6 +114,32 @@ module regfile_single(
  endmodule
 
 
+module regfileTID #(parameter TID=0) (
+    input logic clk,
+    input logic [4:0] a1, a2, a3,
+    input logic we3,
+    input logic [31:0] wd3,
+    output logic [31:0] rd1, rd2);
+
+    logic [31:0] regs [31:0];
+
+    always_ff @(negedge clk)
+        if(we3) begin
+            regs[a3] <= wd3;
+            $display("reg write: a3=%h, wd3=%h", a3, wd3);
+        end
+
+    /*
+    always @(posedge clk)
+        $display("1=%h, 2=%h, 3=%h, 4=%h, 5=%h, 6=%h, 7=%h, 8=%h", regs[1], regs[2], regs[3], regs[4], regs[5], regs[6], regs[7], regs[8]);
+        */
+        
+    assign rd1 = (a1 == 0)? 0 : ((a1 == 5'd31)? TID : regs[a1]);
+    assign rd2 = (a2 == 0)? 0 : ((a2 == 5'd31)? TID : regs[a2]);    
+
+ endmodule
+
+
 module regfile(
     input logic clk,
     input logic [4:0] a1, a2, a3,
@@ -181,6 +207,286 @@ module sram(input logic clk,
         
     assign rd = SRAM[addr];
 endmodule
+
+
+ /*
+SRAM 64K byte, 16K word. 4bank with 4FIFO.
+Written data can be read after 2 clock cycle.
+*/
+module sram_fp(input logic clk, reset,
+            input logic [13:0] addr0,
+            input logic we0,
+            input logic [31:0] wd0,
+            output logic [31:0] rd0,
+
+            input logic [13:0] addr1,
+            input logic we1,
+            input logic [31:0] wd1,
+            output logic [31:0] rd1,
+
+            input logic [13:0] addr2,
+            input logic we2,
+            input logic [31:0] wd2,
+            output logic [31:0] rd2,
+            
+            input logic [13:0] addr3,
+            input logic we3,
+            input logic [31:0] wd3,
+            output logic [31:0] rd3
+            );
+    
+    // 0, 4, 8, 12, 16, ...
+    logic [31:0] BANK0 [4*1024-1:0];
+    // 1, 5, 9, 13, 17, ...
+    logic [31:0] BANK1 [4*1024-1:0];
+    // 2, 6, 10, 14, 18, ...
+    logic [31:0] BANK2 [4*1024-1:0];
+    // 3, 7, 11, 15, 19, ...
+    logic [31:0] BANK3 [4*1024-1:0];
+
+    logic [13:0] cur_addr0, cur_addr1, cur_addr2, cur_addr3;
+    logic [31:0] cur_data0, cur_data1, cur_data2, cur_data3;
+    logic cur_re0, cur_re1, cur_re2, cur_re3;
+    logic full0, full1, full2, full3, empty0, empty1, empty2, empty3;
+
+    cmn_fifo #(.DW(14+32), .AW(8))
+    u_awfifo0(
+    .clk      (clk),
+    .rstn     (!reset),
+    .we       (we0),
+    .wdata    ({addr0, wd0}),
+    .re       (cur_re0),
+    .rdata    ({cur_addr0, cur_data0}),
+    .full     (full0),
+    .empty    (empty0)
+    );
+
+    cmn_fifo #(.DW(14+32), .AW(8))
+    u_awfifo1(
+    .clk      (clk),
+    .rstn     (!reset),
+    .we       (we1),
+    .wdata    ({addr1, wd1}),
+    .re       (cur_re1),
+    .rdata    ({cur_addr1, cur_data1}),
+    .full     (full1),
+    .empty    (empty1)
+    );
+ 
+    cmn_fifo #(.DW(14+32), .AW(8))
+    u_awfifo2(
+    .clk      (clk),
+    .rstn     (!reset),
+    .we       (we2),
+    .wdata    ({addr2, wd2}),
+    .re       (cur_re2),
+    .rdata    ({cur_addr2, cur_data2}),
+    .full     (full2),
+    .empty    (empty2)
+    );
+
+    cmn_fifo #(.DW(14+32), .AW(8))
+    u_awfifo3(
+    .clk      (clk),
+    .rstn     (!reset),
+    .we       (we3),
+    .wdata    ({addr3, wd3}),
+    .re       (cur_re3),
+    .rdata    ({cur_addr3, cur_data3}),
+    .full     (full3),
+    .empty    (empty3)
+    );
+
+
+
+    always_ff @(posedge clk)
+        begin
+            // fifo0
+            if(empty0)
+                cur_re0 <= 0;
+            else
+                begin
+                    case(cur_addr0[1:0])
+                        2'b00: BANK0[cur_addr0[13:2]] <= cur_data0;
+                        2'b01: BANK1[cur_addr0[13:2]] <= cur_data0;
+                        2'b10: BANK2[cur_addr0[13:2]] <= cur_data0;
+                        2'b11: BANK3[cur_addr0[13:2]] <= cur_data0;
+                    endcase
+                    cur_re0 <= 1;
+                end
+
+            // fifo1
+            if(empty1)
+                cur_re1 <= 0;
+            else
+                begin
+                    case(cur_addr1[1:0])
+                        2'b00:
+                            if(!empty0 & (cur_addr0[1:0] == 2'b00))
+                                cur_re1 <= 0;
+                            else
+                                begin
+                                    BANK0[cur_addr1[13:2]] <= cur_data1;
+                                    cur_re1 <= 1;
+                                end
+                        2'b01:
+                            if(!empty0 & (cur_addr0[1:0] == 2'b01))
+                                cur_re1 <= 0;
+                            else
+                                begin
+                                    BANK1[cur_addr1[13:2]] <= cur_data1;
+                                    cur_re1 <= 1;
+                                end
+                        2'b10:
+                            if(!empty0 & (cur_addr0[1:0] == 2'b10))
+                                cur_re1 <= 0;
+                            else
+                                begin
+                                    BANK2[cur_addr1[13:2]] <= cur_data1;
+                                    cur_re1 <= 1;
+                                end
+                        2'b11:
+                            if(!empty0 & (cur_addr0[1:0] == 2'b11))
+                                cur_re1 <= 0;
+                            else
+                                begin
+                                    BANK3[cur_addr1[13:2]] <= cur_data1;
+                                    cur_re1 <= 1;
+                                end
+                    endcase
+                end
+
+
+            // fifo2
+            if(empty2)
+                cur_re2 <= 0;
+            else
+                begin
+                    case(cur_addr2[1:0])
+                        2'b00:
+                            if((!empty0 & (cur_addr0[1:0] == 2'b00)) | (!empty1 &(cur_addr1[1:0] == 2'b00)))
+                                cur_re2 <= 0;
+                            else
+                                begin
+                                    BANK0[cur_addr2[13:2]] <= cur_data2;
+                                    cur_re2 <= 1;
+                                end
+                        2'b01:
+                            if((!empty0 & (cur_addr0[1:0] == 2'b01)) | (!empty1 &(cur_addr1[1:0] == 2'b01)))
+                                cur_re2 <= 0;
+                            else
+                                begin
+                                    BANK1[cur_addr2[13:2]] <= cur_data2;
+                                    cur_re2 <= 1;
+                                end
+                        2'b10:
+                            if((!empty0 & (cur_addr0[1:0] == 2'b10)) | (!empty1 &(cur_addr1[1:0] == 2'b10)))
+                                cur_re2 <= 0;
+                            else
+                                begin
+                                    BANK2[cur_addr2[13:2]] <= cur_data2;
+                                    cur_re2 <= 1;
+                                end
+                        2'b11:
+                            if((!empty0 & (cur_addr0[1:0] == 2'b11)) | (!empty1 &(cur_addr1[1:0] == 2'b11)))
+                                cur_re2 <= 0;
+                            else
+                                begin
+                                    BANK3[cur_addr2[13:2]] <= cur_data2;
+                                    cur_re2 <= 1;
+                                end
+                    endcase
+                end
+
+            // fifo3
+            if(empty3)
+                cur_re3 <= 0;
+            else
+                begin
+                    case(cur_addr3[1:0])
+                        2'b00:
+                            if((!empty0 & (cur_addr0[1:0] == 2'b00))
+                             | (!empty1 &(cur_addr1[1:0] == 2'b00))
+                             | (!empty2 &(cur_addr2[1:0] == 2'b00))
+                             )
+                                cur_re3 <= 0;
+                            else
+                                begin
+                                    BANK0[cur_addr3[13:2]] <= cur_data3;
+                                    cur_re3 <= 1;
+                                end
+                        2'b01:
+                            if((!empty0 & (cur_addr0[1:0] == 2'b01))
+                             | (!empty1 &(cur_addr1[1:0] == 2'b01))
+                             | (!empty2 &(cur_addr2[1:0] == 2'b01))
+                             )
+                                cur_re3 <= 0;
+                            else
+                                begin
+                                    BANK1[cur_addr3[13:2]] <= cur_data3;
+                                    cur_re3 <= 1;
+                                end
+                        2'b10:
+                            if((!empty0 & (cur_addr0[1:0] == 2'b10))
+                             | (!empty1 &(cur_addr1[1:0] == 2'b10))
+                             | (!empty2 &(cur_addr2[1:0] == 2'b10))
+                             )
+                                cur_re3 <= 0;
+                            else
+                                begin
+                                    BANK2[cur_addr3[13:2]] <= cur_data3;
+                                    cur_re3 <= 1;
+                                end
+                        2'b11:
+                            if((!empty0 & (cur_addr0[1:0] == 2'b11))
+                             | (!empty1 &(cur_addr1[1:0] == 2'b11))
+                             | (!empty2 &(cur_addr2[1:0] == 2'b11))
+                             )
+                                cur_re3 <= 0;
+                            else
+                                begin
+                                    BANK3[cur_addr3[13:2]] <= cur_data3;
+                                    cur_re3 <= 1;
+                                end
+                    endcase
+                end
+        end
+
+
+
+    always_comb
+        begin
+            case(addr0[1:0])
+                2'b00: rd0  = BANK0[addr0[13:2]];
+                2'b01: rd0  = BANK1[addr0[13:2]];
+                2'b10: rd0  = BANK2[addr0[13:2]];
+                2'b11: rd0  = BANK3[addr0[13:2]];
+                default: rd0 = 0;
+            endcase
+            case(addr1[1:0])
+                2'b00: rd1  = BANK0[addr1[13:2]];
+                2'b01: rd1  = BANK1[addr1[13:2]];
+                2'b10: rd1  = BANK2[addr1[13:2]];
+                2'b11: rd1  = BANK3[addr1[13:2]];
+                default: rd1 = 0;
+            endcase
+            case(addr2[1:0])
+                2'b00: rd2  = BANK0[addr2[13:2]];
+                2'b01: rd2  = BANK1[addr2[13:2]];
+                2'b10: rd2  = BANK2[addr2[13:2]];
+                2'b11: rd2  = BANK3[addr2[13:2]];
+                default: rd2 = 0;
+            endcase
+            case(addr3[1:0])
+                2'b00: rd3  = BANK0[addr3[13:2]];
+                2'b01: rd3  = BANK1[addr3[13:2]];
+                2'b10: rd3  = BANK2[addr3[13:2]];
+                2'b11: rd3  = BANK3[addr3[13:2]];
+                default: rd3 = 0;
+            endcase
+        end
+endmodule
+
 
 /*
  module testbench_sram();
