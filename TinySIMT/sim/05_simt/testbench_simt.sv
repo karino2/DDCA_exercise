@@ -83,3 +83,79 @@ module testbench_sram_fp();
 
 endmodule
 
+module testbench_sram_fp_bank_conflict();
+    logic clk, reset;
+
+    logic [13:0] addr0;
+    logic we0;
+    logic [31:0] wd0;
+    logic [31:0] rd0;
+
+    logic [13:0] addr1;
+    logic we1;
+    logic [31:0] wd1;
+    logic [31:0] rd1;
+
+    logic [13:0] addr2;
+    logic we2;
+    logic [31:0] wd2;
+    logic [31:0] rd2;
+    
+    logic [13:0] addr3;
+    logic we3;
+    logic [31:0] wd3;
+    logic [31:0] rd3;
+
+    sram_fp dut(clk, reset,
+            addr0, we0, wd0, rd0,
+            addr1, we1, wd1, rd1,
+            addr2, we2, wd2, rd2,
+            addr3, we3, wd3, rd3);
+
+
+    
+    initial begin
+        {we0, we1, we2, we3} = 4'b0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+
+        // write, bank conflict
+        {we0, we1, we2, we3} = 4'b1111;
+        wd0 = 123;
+        wd1 = 456;
+        wd2 = 789;
+        wd3 = 5555;
+        addr0 = 12;
+        addr1 = 8;
+        addr2 = 4;
+        addr3 = 0;
+
+        clk = 0; #10; clk = 1; #10;
+        {we0, we1, we2, we3} = 4'b0;
+        addr0 = 0;
+        addr1 = 4;
+        addr2 = 8;
+        addr3 = 12;
+        clk = 0; #10; clk = 1; #10;
+        // first thread result must be written first.
+        assert(rd3 === 123) else $error("rd3 is wrong. %d", rd3);
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        assert(rd3 === 123);
+        assert(rd2 ===  456) else $error("rd2 is wrong. %d", rd2);
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        assert(rd3 === 123);
+        assert(rd2 === 456);
+        assert(rd1 ===  789) else $error("rd1 is wrong. %d", rd1);
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        assert(rd3 === 123);
+        assert(rd2 === 456);
+        assert(rd1 === 789);
+        assert(rd0 ===  5555) else $error("rd0 is wrong. %d", rd1);
+        $display("sram_fp bank conflict test done.");
+    end
+
+endmodule
+
