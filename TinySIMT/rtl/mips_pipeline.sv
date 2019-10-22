@@ -57,17 +57,6 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
         else
             ALUCtrl = 3'b010; // lw, sw, etc.
 
-        /*
-        else
-            case(Funct)
-                6'd34: ALUCtrl = 3'b110;
-                 6'b100100: ALUCtrl = 3'b000;
-                 6'b100101: ALUCtrl = 3'b001;
-                 6'b101010: ALUCtrl = 3'b111;
-                 default: ALUCtrl = 3'b010;
-            endcase
-*/
-
     assign Jump = Opcode == 6'b000010;
     always_comb
         case(Opcode)
