@@ -70,7 +70,6 @@ endmodule
 000: and
 001: or
 111: set less than
-
 */
 module alu(
     input logic [31:0] a, b,
@@ -88,6 +87,32 @@ module alu(
     assign zero = (y == 0);
 endmodule
 
+/*
+With multiply.
+
+0010: add
+0110: subtract
+0000: and
+0001: or
+0111: set less than
+1000: mul
+*/
+module alu2(
+    input logic [31:0] a, b,
+    input logic [3:0] f,
+    output logic cout,
+    output logic zero,
+    output logic [31:0] y
+    );
+    
+    logic [31:0] bb, s, y_1;
+
+    mux2 bmux(b, ~b, f[2], bb);
+    adder aluadder(a, bb, f[2], s, cout);
+    mux4 lastmux(a&bb, a|bb, s, {31'b0, s[31]}, f[1:0], y_1);
+    assign y = f[3] ? (a*b) : y_1;
+    assign zero = (y == 0);
+endmodule
 /*
 module testbench_alu();
     logic [31:0] a, b, y;
