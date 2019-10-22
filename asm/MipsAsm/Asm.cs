@@ -59,6 +59,21 @@ namespace MipsAsm
             return String.Format("{0:x8}", word);
         }
 
+        private string AsmSll(List<string> args)
+        {
+            /*
+            // op(6), rs(5), rt, rd, shamt(5), funct(6)
+            // sll rd, rt, shamt
+            var actual = target.AsmOne("sll $4, $3, 5");
+            // 0000 00_00 000_0 0011 0010 0_001 01_00 0000
+             */
+            uint word = 0;
+            word += RegstrToRegnum(args[0]) << 11;
+            word += RegstrToRegnum(args[1]) << 16;
+            word += (0xffff & (uint)int.Parse(args[2])) << 6;
+            return String.Format("{0:x8}", word);
+        }
+
         List<String> SplitArgs(string argstr) {
             return argstr.Split(",").Select(arg => arg.Trim(' ')).ToList();
         }
@@ -109,12 +124,20 @@ namespace MipsAsm
             {
                 return AsmR(args, 42);
             }
+            // Sll not supported in processor.
+            if("sll" == op)
+            {
+                return AsmSll(args);
+            }
             if("beq" == op)
             {
                 return AsmBeq(args);
             }
             if("addi" == op) {
                 return AsmI(args, 8);
+            }
+            if("muli" == op) {
+                return AsmI(args, 10);
             }
             if("ori" == op) {
                 return AsmI(args, 13);

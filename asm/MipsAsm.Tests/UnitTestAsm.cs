@@ -34,6 +34,14 @@ namespace MipsAsm.Tests
         }
 
         [Test]
+        public void TestMuli()
+        {
+            // op: 001010
+            var actual = target.AsmOne("muli $2, $0, 5");
+            Assert.AreEqual("28020005", actual);
+        }
+
+        [Test]
         public void TestOri()
         {
             var actual = target.AsmOne("ori $2, $0, 5");
@@ -87,9 +95,22 @@ namespace MipsAsm.Tests
             Assert.AreEqual("0064202a", actual);
         }
 
+        // Sll not supported in processor.
+        [Test]
+        public void TestSll()
+        {
+            // op(6), rs(5), rt, rd, shamt(5), funct(6)
+            // sll rd, rt, shamt
+            var actual = target.AsmOne("sll $4, $3, 5");
+            // 0000 00_00 000_0 0011 0010 0_001 01_00 0000
+            Assert.AreEqual("00032140", actual);
+        }
+
         [Test]
         public void TestSw()
         {
+            // sw rt, rs, imm
+            // [rs+imm] =[rt]
             var actual = target.AsmOne("sw $7, $3, 68");
             Assert.AreEqual("ac670044", actual);
         }
