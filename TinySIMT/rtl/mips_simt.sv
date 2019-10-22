@@ -107,10 +107,10 @@ module fetch_address_stage
 
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
-            pcCand <=  32'h0040_0000; // PC reset address.
+            pcCand <=  32'h0000_0000; // PC reset address.
             pcSrcCur <= 2'b0;
-            pcBranchCur <= 32'b0;
-            pcJumpCur <= 32'b0;
+            pcBranchCur <= 32'h0000_0000;
+            pcJumpCur <= 32'h0000_0000;
         end
         else if(!Stall) begin
             pcCand <= (inPC < pc) ? pc : pcPlus4;
@@ -150,7 +150,7 @@ module fetch_stage #(parameter FILENAME="romdata.mem")
 
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
-            pcCand <=  32'h0040_0000; // PC reset address.
+            pcCand <=  32'h0000_0000; // PC reset address.
             pcSrcCur = 2'b0;
             pcBranchCur = 32'b0;
             pcJumpCur = 32'b0;
@@ -184,7 +184,7 @@ module fetch2decode(input logic clk, reset, stall,
              output logic [31:0] instrD, pcD);
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
-                pcD <= 32'h0040_0000; // PC reset address.
+                pcD <= 32'h0000_0000; // PC reset address.
                 instrD <= 0;
                 pcSrcDNext <= 0;
             end
@@ -500,7 +500,12 @@ module simt_core #(parameter TID=0) (
         branchPredict of F1 fail. clear wrong pre-fetching.
     */
     assign instrD = (pcSrcDNext[0] | pcSrcDNext[1] | execOtherCoreF) ? 0 : instrDCand;
-    assign pcPlus4D =  (pcSrcDNext[0] | pcSrcDNext[1] | execOtherCoreF) ? 32'h0040_0000 : pcPlus4DCand;
+    assign pcPlus4D =  (pcSrcDNext[0] | pcSrcDNext[1] | execOtherCoreF) ? 32'h0000_0000 : pcPlus4DCand;
+
+    /*
+    always @(posedge clk)
+        $display("(%01d) curPC=%h, inPC=%h, pcJumpD=%h, pcBranchD=%h, pcPlus4D=%h, instrD=%h, sdn=%b, eo=%b", TID, curPC, inPC, pcJumpD, pcBranchD, pcPlus4D, instrD, pcSrcDNext, execOtherCoreF);
+        */
 
     always_ff @(posedge clk, posedge reset)
         if(reset)

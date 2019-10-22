@@ -126,7 +126,8 @@ module regfileTID #(parameter TID=0) (
     always_ff @(negedge clk)
         if(we3) begin
             regs[a3] <= wd3;
-            $display("reg write: a3=%h, wd3=%h", a3, wd3);
+            if(a3 != 0)
+                $display("reg write(%01d): a3=%h, wd3=%h", TID, a3, wd3);
         end
 
     /*
