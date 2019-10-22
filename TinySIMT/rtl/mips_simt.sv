@@ -435,8 +435,6 @@ module simt_core #(parameter TID=0) (
     logic ImmtoRegD, ImmtoRegE, ImmtoRegM;
     logic IsZeroImmD;
     logic [1:0] DmaCmdD, DmaCmdE, DmaCmdM;
-    // regData1, regReadData2, immExtend
-    // regData1E, regData2E, immExtendE, 
 
 
     assign halting = HaltD|HaltE|HaltM|HaltW | halt;

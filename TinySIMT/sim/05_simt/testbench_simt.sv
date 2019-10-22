@@ -274,3 +274,24 @@ module testbench_simt_beq_complex();
         assert(dut.DataMem.BANK3[0] === 13) else $error("wrong fourth data: %h", dut.DataMem.BANK3[0]);
     end
 endmodule
+
+
+module testbench_simt_beq_backward();
+    logic clk, reset, halt;
+
+    simt_with_sram #("simt_beq_backward.mem") dut(clk, reset, halt);
+
+    initial begin
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+        repeat(250)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        assert(dut.DataMem.BANK0[0] === 1) else $error("wrong first data: %h", dut.DataMem.BANK0[0]);
+        assert(dut.DataMem.BANK1[0] === 1) else $error("wrong sec data: %h", dut.DataMem.BANK1[0]);
+        assert(dut.DataMem.BANK2[0] === 55) else $error("wrong third data: %h", dut.DataMem.BANK2[0]);
+        assert(dut.DataMem.BANK3[0] === 1) else $error("wrong fourth data: %h", dut.DataMem.BANK3[0]);
+    end
+endmodule
