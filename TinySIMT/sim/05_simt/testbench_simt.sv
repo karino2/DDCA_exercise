@@ -73,6 +73,8 @@ module testbench_sram_fp();
         addr2 = 3;
         addr3 = 0;
         clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
         assert(rd0 === 456) else $error("rd0 wrong, %d", rd0);
         assert(rd1 === 5555) else $error("rd1 wrong, %d", rd1);
         assert(rd2 === 789) else $error("rd2 wrong, %d", rd2);
@@ -136,6 +138,8 @@ module testbench_sram_fp_bank_conflict();
         addr1 = 4;
         addr2 = 8;
         addr3 = 12;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
         clk = 0; #10; clk = 1; #10;
         // first thread result must be written first.
         assert(rd3 === 123) else $error("rd3 is wrong. %d", rd3);

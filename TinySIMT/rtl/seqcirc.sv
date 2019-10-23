@@ -212,7 +212,7 @@ endmodule
 
  /*
 SRAM 64K byte, 16K word. 4bank with 4FIFO.
-Written data can be read after 2 clock cycle.
+Written data can be read after 3 clock cycle.
 */
 module sram_fp(input logic clk, reset,
             input logic [13:0] addr0,
@@ -250,8 +250,15 @@ module sram_fp(input logic clk, reset,
     logic cur_re0, cur_re1, cur_re2, cur_re3;
     logic full0, full1, full2, full3, empty0, empty1, empty2, empty3;
 
+    logic [11:0] b_addr0, b_addr1, b_addr2, b_addr3, b_in_addr0, b_in_addr1, b_in_addr2, b_in_addr3;
+    logic [31:0] b_data0, b_data1, b_data2, b_data3, b_wd0, b_wd1, b_wd2, b_wd3;
+    logic b_re0, b_re1, b_re2, b_re3, b_we0, b_we1, b_we2, b_we3;
+    logic b_full0, b_full1, b_full2, b_full3, b_empty0, b_empty1, b_empty2, b_empty3;
+
+
+
     cmn_fifo #(.DW(14+32), .AW(8))
-    u_awfifo0(
+    u_awfifo_core0(
     .clk      (clk),
     .rstn     (!reset),
     .we       (we0),
@@ -263,7 +270,7 @@ module sram_fp(input logic clk, reset,
     );
 
     cmn_fifo #(.DW(14+32), .AW(8))
-    u_awfifo1(
+    u_awfifo_core1(
     .clk      (clk),
     .rstn     (!reset),
     .we       (we1),
@@ -275,7 +282,7 @@ module sram_fp(input logic clk, reset,
     );
  
     cmn_fifo #(.DW(14+32), .AW(8))
-    u_awfifo2(
+    u_awfifo_core2(
     .clk      (clk),
     .rstn     (!reset),
     .we       (we2),
@@ -287,7 +294,7 @@ module sram_fp(input logic clk, reset,
     );
 
     cmn_fifo #(.DW(14+32), .AW(8))
-    u_awfifo3(
+    u_awfifo_core3(
     .clk      (clk),
     .rstn     (!reset),
     .we       (we3),
@@ -299,19 +306,115 @@ module sram_fp(input logic clk, reset,
     );
 
 
+    cmn_fifo #(.DW(12+32), .AW(1))
+    u_awfifo_bank0(
+    .clk      (clk),
+    .rstn     (!reset),
+    .we       (b_we0),
+    .wdata    ({b_in_addr0, b_wd0}),
+    .re       (b_re0),
+    .rdata    ({b_addr0, b_data0}),
+    .full     (b_full0),
+    .empty    (b_empty0)
+    );
+
+    cmn_fifo #(.DW(12+32), .AW(1))
+    u_awfifo_bank1(
+    .clk      (clk),
+    .rstn     (!reset),
+    .we       (b_we1),
+    .wdata    ({b_in_addr1, b_wd1}),
+    .re       (b_re1),
+    .rdata    ({b_addr1, b_data1}),
+    .full     (b_full1),
+    .empty    (b_empty1)
+    );
+ 
+    cmn_fifo #(.DW(12+32), .AW(1))
+    u_awfifo_bank2(
+    .clk      (clk),
+    .rstn     (!reset),
+    .we       (b_we2),
+    .wdata    ({b_in_addr2, b_wd2}),
+    .re       (b_re2),
+    .rdata    ({b_addr2, b_data2}),
+    .full     (b_full2),
+    .empty    (b_empty2)
+    );
+
+    cmn_fifo #(.DW(12+32), .AW(1))
+    u_awfifo_bank3(
+    .clk      (clk),
+    .rstn     (!reset),
+    .we       (b_we3),
+    .wdata    ({b_in_addr3, b_wd3}),
+    .re       (b_re3),
+    .rdata    ({b_addr3, b_data3}),
+    .full     (b_full3),
+    .empty    (b_empty3)
+    );
+
+
+
 
     always_ff @(posedge clk)
         begin
+            // bank
+            if(b_empty0)
+                b_re0 <= 0;
+            else
+                begin
+                    BANK0[b_addr0] <= b_data0;
+                    b_re1 <= 1;
+                end
+            if(b_empty1)
+                b_re1 <= 0;
+            else
+                begin
+                    BANK1[b_addr1] <= b_data1;
+                    b_re1 <= 1;
+                end
+            if(b_empty2)
+                b_re2 <= 0;
+            else
+                begin
+                    BANK2[b_addr2] <= b_data2;
+                    b_re2 <= 1;
+                end
+            if(b_empty3)
+                b_re3 <= 0;
+            else
+                begin
+                    BANK3[b_addr3] <= b_data3;
+                    b_re3 <= 1;
+                end
+
             // fifo0
             if(empty0)
                 cur_re0 <= 0;
             else
                 begin
-                    case(cur_addr0[1:0])
-                        2'b00: BANK0[cur_addr0[13:2]] <= cur_data0;
-                        2'b01: BANK1[cur_addr0[13:2]] <= cur_data0;
-                        2'b10: BANK2[cur_addr0[13:2]] <= cur_data0;
-                        2'b11: BANK3[cur_addr0[13:2]] <= cur_data0;
+                    case(cur_addr0[1:0])                        
+                        2'b00: begin
+                            b_in_addr0 <= cur_addr0[13:2];
+                            b_wd0 <= cur_data0;
+                            b_we0 <= 1;
+                        end
+                        2'b01: begin
+                            b_in_addr1 <= cur_addr0[13:2];
+                            b_wd1 <= cur_data0;
+                            b_we1 <= 1;
+                        end
+                        2'b10: begin
+                            b_in_addr2 <= cur_addr0[13:2];
+                            b_wd2 <= cur_data0;
+                            b_we2 <= 1;
+                        end
+                        2'b11: begin
+                            b_in_addr3 <= cur_addr0[13:2];
+                            b_wd3 <= cur_data0;
+                            b_we3 <= 1;                        
+                        end 
                     endcase
                     cur_re0 <= 1;
                 end
@@ -327,7 +430,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re1 <= 0;
                             else
                                 begin
-                                    BANK0[cur_addr1[13:2]] <= cur_data1;
+                                    b_in_addr0 <= cur_addr1[13:2];
+                                    b_wd0 <= cur_data1;
+                                    b_we0 <= 1;
                                     cur_re1 <= 1;
                                 end
                         2'b01:
@@ -335,7 +440,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re1 <= 0;
                             else
                                 begin
-                                    BANK1[cur_addr1[13:2]] <= cur_data1;
+                                    b_in_addr1 <= cur_addr1[13:2];
+                                    b_wd1 <= cur_data1;
+                                    b_we1 <= 1;
                                     cur_re1 <= 1;
                                 end
                         2'b10:
@@ -343,7 +450,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re1 <= 0;
                             else
                                 begin
-                                    BANK2[cur_addr1[13:2]] <= cur_data1;
+                                    b_in_addr2 <= cur_addr1[13:2];
+                                    b_wd2 <= cur_data1;
+                                    b_we2 <= 1;
                                     cur_re1 <= 1;
                                 end
                         2'b11:
@@ -351,7 +460,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re1 <= 0;
                             else
                                 begin
-                                    BANK3[cur_addr1[13:2]] <= cur_data1;
+                                    b_in_addr3 <= cur_addr1[13:2];
+                                    b_wd3 <= cur_data1;
+                                    b_we3 <= 1;
                                     cur_re1 <= 1;
                                 end
                     endcase
@@ -369,7 +480,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re2 <= 0;
                             else
                                 begin
-                                    BANK0[cur_addr2[13:2]] <= cur_data2;
+                                    b_in_addr0 <= cur_addr2[13:2];
+                                    b_wd0 <= cur_data2;
+                                    b_we0 <= 1;
                                     cur_re2 <= 1;
                                 end
                         2'b01:
@@ -377,7 +490,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re2 <= 0;
                             else
                                 begin
-                                    BANK1[cur_addr2[13:2]] <= cur_data2;
+                                    b_in_addr1 <= cur_addr2[13:2];
+                                    b_wd1 <= cur_data2;
+                                    b_we1 <= 1;
                                     cur_re2 <= 1;
                                 end
                         2'b10:
@@ -385,7 +500,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re2 <= 0;
                             else
                                 begin
-                                    BANK2[cur_addr2[13:2]] <= cur_data2;
+                                    b_in_addr2 <= cur_addr2[13:2];
+                                    b_wd2 <= cur_data2;
+                                    b_we2 <= 1;
                                     cur_re2 <= 1;
                                 end
                         2'b11:
@@ -393,7 +510,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re2 <= 0;
                             else
                                 begin
-                                    BANK3[cur_addr2[13:2]] <= cur_data2;
+                                    b_in_addr3 <= cur_addr2[13:2];
+                                    b_wd3 <= cur_data2;
+                                    b_we3 <= 1;
                                     cur_re2 <= 1;
                                 end
                     endcase
@@ -413,7 +532,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re3 <= 0;
                             else
                                 begin
-                                    BANK0[cur_addr3[13:2]] <= cur_data3;
+                                    b_in_addr0 <= cur_addr3[13:2];
+                                    b_wd0 <= cur_data3;
+                                    b_we0 <= 1;
                                     cur_re3 <= 1;
                                 end
                         2'b01:
@@ -424,7 +545,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re3 <= 0;
                             else
                                 begin
-                                    BANK1[cur_addr3[13:2]] <= cur_data3;
+                                    b_in_addr1 <= cur_addr3[13:2];
+                                    b_wd1 <= cur_data3;
+                                    b_we1 <= 1;
                                     cur_re3 <= 1;
                                 end
                         2'b10:
@@ -435,7 +558,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re3 <= 0;
                             else
                                 begin
-                                    BANK2[cur_addr3[13:2]] <= cur_data3;
+                                    b_in_addr2 <= cur_addr3[13:2];
+                                    b_wd2 <= cur_data3;
+                                    b_we2 <= 1;
                                     cur_re3 <= 1;
                                 end
                         2'b11:
@@ -446,7 +571,9 @@ module sram_fp(input logic clk, reset,
                                 cur_re3 <= 0;
                             else
                                 begin
-                                    BANK3[cur_addr3[13:2]] <= cur_data3;
+                                    b_in_addr3 <= cur_addr3[13:2];
+                                    b_wd3 <= cur_data3;
+                                    b_we3 <= 1;
                                     cur_re3 <= 1;
                                 end
                     endcase
