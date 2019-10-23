@@ -154,45 +154,6 @@ endmodule
 
 
 
-module fetch_stage #(parameter FILENAME="romdata.mem")
-            (input logic clk, reset, Stall, Halt,
-             input logic [1:0] pcSrc,
-                input logic [31:0] pcBranch, pcJump,
-                output logic [31:0] pcPlus4, instr);
-    logic [31:0] pc, pcCand, /* newPC, */ instrRead, pcBranchCur, pcJumpCur;
-    logic [1:0] pcSrcCur;
-
-    // flopr Pcflop(clk, reset, !Stall, newPC, pcCand);
-    romcode #(FILENAME) InstRom(pc[15:2], instrRead);
-
-    always_ff @(posedge clk, posedge reset)
-        if(reset) begin
-            pcCand <=  32'h0000_0000; // PC reset address.
-            pcSrcCur = 2'b0;
-            pcBranchCur = 32'b0;
-            pcJumpCur = 32'b0;
-        end
-        else if(!Stall) begin
-            pcCand <= pcPlus4;
-            pcSrcCur <= pcSrc;
-            pcBranchCur = pcBranch;
-            pcJumpCur = pcJump;
-        end
-
-
-
-    assign pc = (pcSrcCur == 2'b01) ? pcBranchCur : ((pcSrcCur == 2'b10) ? pcJumpCur : pcCand);
-    assign pcPlus4 = pc+4;
-    assign instr = Halt ? 32'b0 : instrRead;
-
-    /*
-    always @(posedge clk)
-        $display("instr %h, pc=%h, pcSrcCurC=%b, Stall=%b", instr, pc, pcSrcCur, Stall);
-    */
-
-    // assign newPC = (pcSrc == 2'b01) ? pcBranch:  ((pcSrc == 2'b10) ? pcJump : pcPlus4);
-
-endmodule
 
 module fetch2decode(input logic clk, reset, stall, 
              input logic [1:0] pcSrcD,
