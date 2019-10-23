@@ -3,7 +3,8 @@
 #
 
 set dev 0
-set bit "output/arty_top_pipeline.bit"
+set bit "output/arty_top_simt.bit"
+# set bit "output/arty_top_pipeline.bit"
 # set bit "output/arty_top.bit"
 
 #

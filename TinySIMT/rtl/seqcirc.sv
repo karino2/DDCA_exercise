@@ -462,28 +462,24 @@ module sram_fp(input logic clk, reset,
                 2'b01: rd0  = BANK1[addr0[13:2]];
                 2'b10: rd0  = BANK2[addr0[13:2]];
                 2'b11: rd0  = BANK3[addr0[13:2]];
-                default: rd0 = 0;
             endcase
             case(addr1[1:0])
                 2'b00: rd1  = BANK0[addr1[13:2]];
                 2'b01: rd1  = BANK1[addr1[13:2]];
                 2'b10: rd1  = BANK2[addr1[13:2]];
                 2'b11: rd1  = BANK3[addr1[13:2]];
-                default: rd1 = 0;
             endcase
             case(addr2[1:0])
                 2'b00: rd2  = BANK0[addr2[13:2]];
                 2'b01: rd2  = BANK1[addr2[13:2]];
                 2'b10: rd2  = BANK2[addr2[13:2]];
                 2'b11: rd2  = BANK3[addr2[13:2]];
-                default: rd2 = 0;
             endcase
             case(addr3[1:0])
                 2'b00: rd3  = BANK0[addr3[13:2]];
                 2'b01: rd3  = BANK1[addr3[13:2]];
                 2'b10: rd3  = BANK2[addr3[13:2]];
                 2'b11: rd3  = BANK3[addr3[13:2]];
-                default: rd3 = 0;
             endcase
         end
 endmodule

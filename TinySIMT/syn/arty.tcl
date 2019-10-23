@@ -5,7 +5,8 @@
 set_param general.maxThreads 8
 
 # set top    {arty_top_single}
-set top    {arty_top_pipeline}
+# set top    {arty_top_pipeline}
+set top    {arty_top_simt}
 set part   {xc7a35ticsg324-1L}
 set board  {digilentinc.com:arty:part0:1.1}
 set debug  0
@@ -13,7 +14,8 @@ set output {output}
 
 set inc_list    {}
 set ip_dir      {../ip/output}
-set file_list   {../rtl/arty_top.sv ../rtl/cmn.sv ../rtl/alu.sv ../rtl/mips_single.sv ../rtl/mips_pipeline.sv ../rtl/seqcirc.sv ../rtl/dmac.sv}
+# set file_list   {../rtl/arty_top.sv ../rtl/cmn.sv ../rtl/alu.sv ../rtl/mips_single.sv ../rtl/mips_pipeline.sv ../rtl/seqcirc.sv ../rtl/dmac.sv}
+set file_list   {../rtl/arty_top.sv ../rtl/cmn.sv ../rtl/alu.sv ../rtl/mips_simt.sv ../rtl/seqcirc.sv ../rtl/dmac.sv}
 set xdc_list    {arty.xdc}
 
 #

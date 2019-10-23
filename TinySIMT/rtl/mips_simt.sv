@@ -730,3 +730,133 @@ module simt_group #(parameter FILENAME="romdata.mem")
      dmaCmd3, dmaSrcAddress3, dmaDstAddress3, dmaWidth3, halt3);
 
 endmodule
+
+
+module simt_sram_dmac_led #(parameter FILENAME="simt_beq_backward.mem")
+    (input logic clk, reset, 
+        output logic halt,
+        output logic [2:0] led,
+        output logic [31:0] dramAddress, dramWriteData,
+        output logic dramWriteEnable, dramReadEnable,
+        input logic [31:0] dramReadData,
+        input logic dramValid
+    );
+    // sram core 0
+    logic [31:0] sramReadData0;
+    logic [31:0] sramDataAddress0, sramWriteData0;
+    logic sramWriteEnable0;
+    // sram core1
+    logic [31:0] sramReadData1;
+    logic [31:0] sramDataAddress1, sramWriteData1;
+    logic sramWriteEnable1;
+    // sram core2
+    logic [31:0] sramReadData2;
+    logic [31:0] sramDataAddress2, sramWriteData2;
+    logic sramWriteEnable2;
+    // sram core3
+    logic [31:0] sramReadData3;
+    logic [31:0] sramDataAddress3, sramWriteData3;
+    logic sramWriteEnable3;
+    // DMA
+    logic [1:0] dmaCmd; //00: nothing  01: d2s   10:s2d 
+    logic [31:0] dmaSrcAddress, dmaDstAddress;
+    logic [9:0] dmaWidth;
+
+    logic [13:0] sramDataAddressMain;
+    logic [31:0] sramReadDataMain, sramWriteDataMain;
+    logic sramWriteEnableMain;
+
+    logic [31:0] sramReadDataBuf;
+    logic [13:0] sramAddressForDMAC;
+    logic [31:0] sramWriteDataForDMAC;
+    logic sramWriteEnableForDMAC;
+
+    logic dmaStall;
+
+    sram_fp DataMem(clk, reset,
+            sramDataAddressMain, sramWriteEnableMain, sramWriteDataMain, sramReadDataMain,
+//                sramDataAddress0[15:2], sramWriteEnable0, sramWriteData0, sramReadData0,
+            sramDataAddress1[15:2], sramWriteEnable1, sramWriteData1, sramReadData1,
+            sramDataAddress2[15:2], sramWriteEnable2, sramWriteData2, sramReadData2,
+            sramDataAddress3[15:2], sramWriteEnable3, sramWriteData3, sramReadData3);
+
+    simt_group #(FILENAME) u_cpus(clk, reset, dmaStall,
+        sramReadData0,
+        sramDataAddress0, sramWriteData0,
+        sramWriteEnable0,
+        // sram core1
+        sramReadData1,
+        sramDataAddress1, sramWriteData1,
+        sramWriteEnable1,
+        // sram core2
+        sramReadData2,
+        sramDataAddress2, sramWriteData2,
+        sramWriteEnable2,
+        // sram core3
+        sramReadData3,
+        sramDataAddress3, sramWriteData3,
+        sramWriteEnable3,
+        // DMA
+        dmaCmd, //00: nothing  01: d2s   10:s2d 
+        dmaSrcAddress, dmaDstAddress, 
+        dmaWidth,
+        halt);
+
+    dma_ctrl u_dmac(clk, reset, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth,
+                sramReadDataBuf, dramReadData,
+                sramAddressForDMAC, sramWriteDataForDMAC, sramWriteEnableForDMAC,
+                dramAddress, dramWriteData, dramWriteEnable, dramReadEnable,
+                dramValid, dmaStall);
+
+    /*
+    led map
+    0x8000_0000: led[0]
+    0x8000_0004: led[1]
+    0x8000_0008: led[2]
+    only first core map to led.
+    */
+    always_ff @(posedge clk, posedge reset)
+        if(reset)
+            begin   
+                led <= 3'b0;
+                sramReadDataBuf <= 32'b0;
+            end
+        else
+            begin
+                sramReadDataBuf <= sramReadDataMain;
+                if(sramWriteEnable0 & sramDataAddress0[31])
+                    case(sramDataAddress0[3:0])
+                        4'b0: led[0] <= sramWriteData0[0];
+                        4'b100: led[1] <= sramWriteData0[0];
+                        4'b1000: led[2] <= sramWriteData0[0];
+                    endcase
+            end
+
+  always_comb
+    if(dmaStall)
+      begin
+        sramDataAddressMain = sramAddressForDMAC;
+        sramWriteEnableMain = sramWriteEnableForDMAC;
+        sramWriteDataMain = sramWriteDataForDMAC;
+        sramReadData0 = 32'b0;        
+      end
+    else
+      begin
+        if(sramDataAddress0[31])
+            begin
+                sramDataAddressMain = 14'b0;
+                sramWriteEnableMain = 0;
+                sramWriteDataMain = 32'b0;
+                sramReadData0 = 32'b0;        
+            end
+        else
+            begin
+                sramDataAddressMain = sramDataAddress0[15:2];
+                sramWriteEnableMain = sramWriteEnable0;
+                sramWriteDataMain = sramWriteData0;
+                sramReadData0 = sramReadDataMain;        
+            end
+      end
+
+
+endmodule
