@@ -147,6 +147,16 @@ namespace MipsAsm.Tests
         }
 
         [Test]
+        public void TestJLabel()
+        {
+            var actual = target.AsmOne("j hoge");
+            Assert.AreEqual("08000000", actual);
+            Assert.AreEqual("hoge", target.needResolve[0].Label);
+            Assert.AreEqual(0, target.needResolve[0].Pos);
+            target.Clear();
+        }
+
+        [Test]
         public void TestStripComment()
         {
             var actual = target.StripComment("j 17 // hello world");
@@ -164,6 +174,16 @@ namespace MipsAsm.Tests
         {
             var actual = target.StripComment("// only comment");
             Assert.AreEqual(String.Empty, actual);
+        }
+
+
+        [Test]
+        public void TestLabel_AddMap()
+        {
+            target.AsmOne("some_label:");
+            Assert.IsTrue(target.labelMap.ContainsKey("some_label"));
+            Assert.AreEqual(0, target.labelMap["some_label"]);
+            target.Clear();
         }
 
         [Test]
@@ -193,6 +213,20 @@ namespace MipsAsm.Tests
             // op code is 001100 (12)
             var actual = target.AsmOne("dsync");
             Assert.AreEqual("30000000", actual);
+        }
+
+        [Test]
+        public void TestResolveLabel_Backward()
+        {
+            target.Emit(target.AsmOne("addi $3, $0, 5"));
+            target.Emit(target.AsmOne("addi $3, $0, 5"));
+            target.Emit(target.AsmOne("addi $3, $0, 5"));
+            target.AsmOne("hoge:");
+            target.Emit(target.AsmOne("addi $3, $0, 5"));
+            target.Emit(target.AsmOne("j hoge"));
+            target.ResolveLabel();
+            Assert.AreEqual("08000003", target.binStore.bins[4]);
+            target.Clear();
         }
     }
 }

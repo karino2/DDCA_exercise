@@ -12,8 +12,39 @@ Use abs address divided by 4 for j argument. Base is decimal.
 
 namespace MipsAsm
 {
+    public class BinStore
+    {
+        public List<String> bins = new List<String>();
+        public int Pos {
+            get{
+                return bins.Count;
+            }
+        }
+        public void Add(String word) {
+            bins.Add(word);
+        }
+
+    }
+
+    public struct LabelEntry {
+        public int Pos;
+        public string Label;
+    }
+
+
     public class Asm
     {
+        // make public for test purpose.
+        public  Dictionary<string, int> labelMap = new Dictionary<string, int>();
+        public List<LabelEntry> needResolve = new List<LabelEntry>();
+        public BinStore binStore = new BinStore();
+
+        public void Clear() {
+            binStore.bins.Clear();
+            labelMap.Clear();
+            needResolve.Clear();
+        }
+
         uint RegstrToRegnum(string regstr) {
             return uint.Parse(regstr.Trim(' ').Substring(1));
         }
@@ -108,6 +139,11 @@ namespace MipsAsm
             {
                 return "38000000";
             }
+            if(op.EndsWith(":"))
+            {
+                labelMap[op.Substring(0, op.Length-1)] = binStore.Pos;
+                return String.Empty;
+            }
 
             var args = SplitArgs(nimArg[1]);
             if("or" == op)
@@ -177,9 +213,13 @@ namespace MipsAsm
             if("j" == op)
             {
                 uint word = 2 << 26;
-
-                word |= (0x3ffffff & (uint)int.Parse(args[0]));
-                return String.Format("{0:x8}", word);
+                int addr;
+                if(int.TryParse(args[0], out addr)) {
+                    word |= (0x3ffffff & (uint)addr);
+                    return String.Format("{0:x8}", word);
+                }
+                needResolve.Add(new LabelEntry { Label = args[0], Pos = binStore.Pos});
+                return String.Format("{0:x8}", word);                
             }
             return String.Empty;
         }
@@ -190,6 +230,18 @@ namespace MipsAsm
             if(parts.Length != 2)
                 return line;
             return parts[0].Trim(' ');
+        }
+
+        public void Emit(string word)
+        {
+            binStore.Add(word);
+        }
+
+        public void PrintAll(StreamWriter sw)
+        {
+            foreach(var line in binStore.bins) {
+                sw.WriteLine(line);
+            }
         }
 
         static void Main(string[] args)
@@ -210,7 +262,6 @@ namespace MipsAsm
 
             try {
                 using var sr = new StreamReader(args[0]);
-                using var sw = new StreamWriter(output);
 
                 var line = sr.ReadLine();
                 while (line != null)
@@ -219,7 +270,8 @@ namespace MipsAsm
                     try {
                         var res = assembler.AsmOne(line);
                         if (!String.IsNullOrEmpty(res))
-                            sw.WriteLine(res);
+                            assembler.Emit(res);                           
+                            // sw.WriteLine(res);
                         line = sr.ReadLine();
                     }catch(System.IndexOutOfRangeException exi) {
                         System.Console.WriteLine($"Index out of range exception: line: {line}, ex: {exi.Message}");
@@ -229,7 +281,24 @@ namespace MipsAsm
             }catch(IOException ex) {
                 System.Console.WriteLine($"IOException: {ex.Message}");
             }
+            assembler.ResolveLabel();
+
+            try {
+                using var sw = new StreamWriter(output);
+                assembler.PrintAll(sw);
+            }catch(IOException ex) {
+                System.Console.WriteLine($"IOException: {ex.Message}");
+            }
         }
 
+        public void ResolveLabel()
+        {
+            foreach(var ent in needResolve) {
+                var wordStr = binStore.bins[ent.Pos];
+                var word = UInt32.Parse(wordStr, System.Globalization.NumberStyles.HexNumber);
+                word |= (uint)labelMap[ent.Label];
+                binStore.bins[ent.Pos] = String.Format("{0:x8}", word);
+            }
+        }
     }
 }
