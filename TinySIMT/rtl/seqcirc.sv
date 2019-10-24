@@ -249,6 +249,10 @@ module sram_fp(input logic clk, reset,
     logic [13:0] cur_addr0, cur_addr1, cur_addr2, cur_addr3;
     logic [31:0] cur_data0, cur_data1, cur_data2, cur_data3;
     logic cur_re0, cur_re1, cur_re2, cur_re3;
+    logic cur_re1b0, cur_re2b0, cur_re3b0;
+    logic cur_re1b1, cur_re2b1, cur_re3b1;
+    logic cur_re1b2, cur_re2b2, cur_re3b2;
+    logic cur_re1b3, cur_re2b3, cur_re3b3;
     logic full0, full1, full2, full3, empty0, empty1, empty2, empty3;
 
     logic [8:0] b_addr0, b_addr1, b_addr2, b_addr3, b_in_addr0, b_in_addr1, b_in_addr2, b_in_addr3;
@@ -256,6 +260,17 @@ module sram_fp(input logic clk, reset,
     logic b_re0, b_re1, b_re2, b_re3, b_we0, b_we1, b_we2, b_we3;
     logic b_full0, b_full1, b_full2, b_full3, b_empty0, b_empty1, b_empty2, b_empty3;
 
+    always @(posedge clk)
+        begin
+            if(we0) 
+                $display("sram write0, %h, %h", addr0, wd0);
+            if(we1) 
+                $display("sram write1, %h, %h", addr1, wd1);
+            if(we2) 
+                $display("sram write2, %h, %h", addr2, wd2);
+            if(we3) 
+                $display("sram write3, %h, %h", addr3, wd3);
+        end
 
 
     cmn_fifo #(.DW(14+32), .AW(8))
@@ -356,229 +371,217 @@ module sram_fp(input logic clk, reset,
     );
 
 
+    always @(posedge clk)
+        begin
+            if(we0 | we1 | we2 | we3)
+                $display("we, %b, %b, %b, %b, r_wc=%h", we0 , we1 , we2 , we3, u_awfifo_core0.r_wc);
+            if(full0 | full1 | full2 | full3 | b_full0 | b_full1 | b_full2 | b_full3)
+                $display("full, %b, %b, %b, %b, %b, %b, %b, %b, r_wc=%h", full0 , full1 , full2 , full3 , b_full0 , b_full1 , b_full2 , b_full3, u_awfifo_core0.r_wc);
+        end
 
+    assign b_re0 = !b_empty0;
+    assign b_re1 = !b_empty1;           
+    assign b_re2 = !b_empty2;
+    assign b_re3 = !b_empty3;
+    assign cur_re0 = !empty0;
+
+    always_comb
+        begin
+            // bank0
+            if(!empty0 & (cur_addr0[1:0] == 2'b00)) begin
+                b_in_addr0 = cur_addr0[10:2];
+                b_wd0 = cur_data0;
+                b_we0 = 1;
+
+                cur_re1b0 = 0;
+                cur_re2b0 = 0;
+                cur_re3b0 = 0;
+            end
+            else if(!empty1 & (cur_addr1[1:0] == 2'b00)) begin
+                b_in_addr0 = cur_addr1[10:2];
+                b_wd0 = cur_data1;
+                b_we0 = 1;
+                cur_re1b0 = 1;
+                cur_re2b0 = 0;
+                cur_re3b0 = 0;
+            end
+            else if(!empty2 & (cur_addr2[1:0] == 2'b00)) begin
+                b_in_addr0 = cur_addr2[10:2];
+                b_wd0 = cur_data2;
+                b_we0 = 1;
+                cur_re1b0 = 0;
+                cur_re2b0 = 1;
+                cur_re3b0 = 0;
+            end
+            else if(!empty3 & (cur_addr3[1:0] == 2'b00)) begin
+                b_in_addr0 = cur_addr3[10:2];
+                b_wd0 = cur_data3;
+                b_we0 = 1;
+                cur_re1b0 = 0;
+                cur_re2b0 = 0;
+                cur_re3b0 = 1;
+            end
+            else begin
+                b_in_addr0 = 0;
+                b_wd0 = 0;
+                b_we0 = 0;
+                cur_re1b0 = 0;
+                cur_re2b0 = 0;
+                cur_re3b0 = 0;
+            end
+
+            // bank1
+            if(!empty0 & (cur_addr0[1:0] == 2'b01)) begin
+                b_in_addr1 = cur_addr0[10:2];
+                b_wd1 = cur_data0;
+                b_we1 = 1;
+                cur_re1b1 = 0;
+                cur_re2b1 = 0;
+                cur_re3b1 = 0;
+            end
+            else if(!empty1 & (cur_addr1[1:0] == 2'b01)) begin
+                b_in_addr1 = cur_addr1[10:2];
+                b_wd1 = cur_data1;
+                b_we1 = 1;
+                cur_re1b1 = 1;
+                cur_re2b1 = 0;
+                cur_re3b1 = 0;
+            end
+            else if(!empty2 & (cur_addr2[1:0] == 2'b01)) begin
+                b_in_addr1 = cur_addr2[10:2];
+                b_wd1 = cur_data2;
+                b_we1 = 1;
+                cur_re1b1 = 0;
+                cur_re2b1 = 1;
+                cur_re3b1 = 0;
+            end
+            else if(!empty3 & (cur_addr3[1:0] == 2'b01)) begin
+                b_in_addr1 = cur_addr3[10:2];
+                b_wd1 = cur_data3;
+                b_we1 = 1;
+                cur_re1b1 = 0;
+                cur_re2b1 = 0;
+                cur_re3b1 = 1;
+            end
+            else begin
+                b_in_addr1 = 0;
+                b_wd1 = 0;
+                b_we1 = 0;
+                cur_re1b1 = 0;
+                cur_re2b1 = 0;
+                cur_re3b1 = 0;
+            end
+
+            // bank2
+            if(!empty0 & (cur_addr0[1:0] == 2'b10)) begin
+                b_in_addr2 = cur_addr0[10:2];
+                b_wd2 = cur_data0;
+                b_we2 = 1;
+                cur_re1b2 = 0;
+                cur_re2b2 = 0;
+                cur_re3b2 = 0;
+            end
+            else if(!empty1 & (cur_addr1[1:0] == 2'b10)) begin
+                b_in_addr2 = cur_addr1[10:2];
+                b_wd2 = cur_data1;
+                b_we2 = 1;
+                cur_re1b2 = 1;
+                cur_re2b2 = 0;
+                cur_re3b2 = 0;
+            end
+            else if(!empty2 & (cur_addr2[1:0] == 2'b10)) begin
+                b_in_addr2 = cur_addr2[10:2];
+                b_wd2 = cur_data2;
+                b_we2 = 1;
+                cur_re1b2 = 0;
+                cur_re2b2 = 1;
+                cur_re3b2 = 0;
+            end
+            else if(!empty3 & (cur_addr3[1:0] == 2'b10)) begin
+                b_in_addr2 = cur_addr3[10:2];
+                b_wd2 = cur_data3;
+                b_we2 = 1;
+                cur_re1b2 = 0;
+                cur_re2b2 = 0;
+                cur_re3b2 = 1;
+            end
+            else begin
+                b_in_addr2 = 0;
+                b_wd2 = 0;
+                b_we2 = 0;
+                cur_re1b2 = 0;
+                cur_re2b2 = 0;
+                cur_re3b2 = 0;
+            end
+
+            // bank3
+            if(!empty0 & (cur_addr0[1:0] == 2'b11)) begin
+                b_in_addr3 = cur_addr0[10:2];
+                b_wd3 = cur_data0;
+                b_we3 = 1;
+                cur_re1b3 = 0;
+                cur_re2b3 = 0;
+                cur_re3b3 = 0;
+            end
+            else if(!empty1 & (cur_addr1[1:0] == 2'b11)) begin
+                b_in_addr3 = cur_addr1[10:2];
+                b_wd3 = cur_data1;
+                b_we3 = 1;
+                cur_re1b3 = 1;
+                cur_re2b3 = 0;
+                cur_re3b3 = 0;
+            end
+            else if(!empty2 & (cur_addr2[1:0] == 2'b11)) begin
+                b_in_addr3 = cur_addr2[10:2];
+                b_wd3 = cur_data2;
+                b_we3 = 1;
+                cur_re1b3 = 0;
+                cur_re2b3 = 1;
+                cur_re3b3 = 0;
+            end
+            else if(!empty3 & (cur_addr3[1:0] == 2'b11)) begin
+                b_in_addr3 = cur_addr3[10:2];
+                b_wd3 = cur_data3;
+                b_we3 = 1;
+                cur_re1b3 = 0;
+                cur_re2b3 = 0;
+                cur_re3b3 = 1;
+            end
+            else begin
+                b_in_addr3 = 0;
+                b_wd3 = 0;
+                b_we3 = 0;
+                cur_re1b3 = 0;
+                cur_re2b3 = 0;
+                cur_re3b3 = 0;
+            end
+
+        end
+
+    assign cur_re1 = cur_re1b0 | cur_re1b1 | cur_re1b2 | cur_re1b3;
+    assign cur_re2 = cur_re2b0 | cur_re2b1 | cur_re2b2 | cur_re2b3;
+    assign cur_re3 = cur_re3b0 | cur_re3b1 | cur_re3b2 | cur_re3b3;
 
     always_ff @(posedge clk)
         begin
             // bank
-            if(b_empty0)
-                b_re0 <= 0;
-            else
+            if(!b_empty0)
                 begin
                     BANK0[b_addr0] <= b_data0;
-                    b_re1 <= 1;
                 end
-            if(b_empty1)
-                b_re1 <= 0;
-            else
+            if(!b_empty1)
                 begin
                     BANK1[b_addr1] <= b_data1;
-                    b_re1 <= 1;
                 end
-            if(b_empty2)
-                b_re2 <= 0;
-            else
+            if(!b_empty2)
                 begin
                     BANK2[b_addr2] <= b_data2;
-                    b_re2 <= 1;
                 end
-            if(b_empty3)
-                b_re3 <= 0;
-            else
+            if(!b_empty3)
                 begin
                     BANK3[b_addr3] <= b_data3;
-                    b_re3 <= 1;
                 end
 
-            // fifo0
-            if(empty0)
-                cur_re0 <= 0;
-            else
-                begin
-                    case(cur_addr0[1:0])                        
-                        2'b00: begin
-                            b_in_addr0 <= cur_addr0[10:2];
-                            b_wd0 <= cur_data0;
-                            b_we0 <= 1;
-                        end
-                        2'b01: begin
-                            b_in_addr1 <= cur_addr0[10:2];
-                            b_wd1 <= cur_data0;
-                            b_we1 <= 1;
-                        end
-                        2'b10: begin
-                            b_in_addr2 <= cur_addr0[10:2];
-                            b_wd2 <= cur_data0;
-                            b_we2 <= 1;
-                        end
-                        2'b11: begin
-                            b_in_addr3 <= cur_addr0[10:2];
-                            b_wd3 <= cur_data0;
-                            b_we3 <= 1;                        
-                        end 
-                    endcase
-                    cur_re0 <= 1;
-                end
-
-            // fifo1
-            if(empty1)
-                cur_re1 <= 0;
-            else
-                begin
-                    case(cur_addr1[1:0])
-                        2'b00:
-                            if(!empty0 & (cur_addr0[1:0] == 2'b00))
-                                cur_re1 <= 0;
-                            else
-                                begin
-                                    b_in_addr0 <= cur_addr1[10:2];
-                                    b_wd0 <= cur_data1;
-                                    b_we0 <= 1;
-                                    cur_re1 <= 1;
-                                end
-                        2'b01:
-                            if(!empty0 & (cur_addr0[1:0] == 2'b01))
-                                cur_re1 <= 0;
-                            else
-                                begin
-                                    b_in_addr1 <= cur_addr1[10:2];
-                                    b_wd1 <= cur_data1;
-                                    b_we1 <= 1;
-                                    cur_re1 <= 1;
-                                end
-                        2'b10:
-                            if(!empty0 & (cur_addr0[1:0] == 2'b10))
-                                cur_re1 <= 0;
-                            else
-                                begin
-                                    b_in_addr2 <= cur_addr1[10:2];
-                                    b_wd2 <= cur_data1;
-                                    b_we2 <= 1;
-                                    cur_re1 <= 1;
-                                end
-                        2'b11:
-                            if(!empty0 & (cur_addr0[1:0] == 2'b11))
-                                cur_re1 <= 0;
-                            else
-                                begin
-                                    b_in_addr3 <= cur_addr1[10:2];
-                                    b_wd3 <= cur_data1;
-                                    b_we3 <= 1;
-                                    cur_re1 <= 1;
-                                end
-                    endcase
-                end
-
-
-            // fifo2
-            if(empty2)
-                cur_re2 <= 0;
-            else
-                begin
-                    case(cur_addr2[1:0])
-                        2'b00:
-                            if((!empty0 & (cur_addr0[1:0] == 2'b00)) | (!empty1 &(cur_addr1[1:0] == 2'b00)))
-                                cur_re2 <= 0;
-                            else
-                                begin
-                                    b_in_addr0 <= cur_addr2[10:2];
-                                    b_wd0 <= cur_data2;
-                                    b_we0 <= 1;
-                                    cur_re2 <= 1;
-                                end
-                        2'b01:
-                            if((!empty0 & (cur_addr0[1:0] == 2'b01)) | (!empty1 &(cur_addr1[1:0] == 2'b01)))
-                                cur_re2 <= 0;
-                            else
-                                begin
-                                    b_in_addr1 <= cur_addr2[10:2];
-                                    b_wd1 <= cur_data2;
-                                    b_we1 <= 1;
-                                    cur_re2 <= 1;
-                                end
-                        2'b10:
-                            if((!empty0 & (cur_addr0[1:0] == 2'b10)) | (!empty1 &(cur_addr1[1:0] == 2'b10)))
-                                cur_re2 <= 0;
-                            else
-                                begin
-                                    b_in_addr2 <= cur_addr2[10:2];
-                                    b_wd2 <= cur_data2;
-                                    b_we2 <= 1;
-                                    cur_re2 <= 1;
-                                end
-                        2'b11:
-                            if((!empty0 & (cur_addr0[1:0] == 2'b11)) | (!empty1 &(cur_addr1[1:0] == 2'b11)))
-                                cur_re2 <= 0;
-                            else
-                                begin
-                                    b_in_addr3 <= cur_addr2[10:2];
-                                    b_wd3 <= cur_data2;
-                                    b_we3 <= 1;
-                                    cur_re2 <= 1;
-                                end
-                    endcase
-                end
-
-            // fifo3
-            if(empty3)
-                cur_re3 <= 0;
-            else
-                begin
-                    case(cur_addr3[1:0])
-                        2'b00:
-                            if((!empty0 & (cur_addr0[1:0] == 2'b00))
-                             | (!empty1 &(cur_addr1[1:0] == 2'b00))
-                             | (!empty2 &(cur_addr2[1:0] == 2'b00))
-                             )
-                                cur_re3 <= 0;
-                            else
-                                begin
-                                    b_in_addr0 <= cur_addr3[10:2];
-                                    b_wd0 <= cur_data3;
-                                    b_we0 <= 1;
-                                    cur_re3 <= 1;
-                                end
-                        2'b01:
-                            if((!empty0 & (cur_addr0[1:0] == 2'b01))
-                             | (!empty1 &(cur_addr1[1:0] == 2'b01))
-                             | (!empty2 &(cur_addr2[1:0] == 2'b01))
-                             )
-                                cur_re3 <= 0;
-                            else
-                                begin
-                                    b_in_addr1 <= cur_addr3[10:2];
-                                    b_wd1 <= cur_data3;
-                                    b_we1 <= 1;
-                                    cur_re3 <= 1;
-                                end
-                        2'b10:
-                            if((!empty0 & (cur_addr0[1:0] == 2'b10))
-                             | (!empty1 &(cur_addr1[1:0] == 2'b10))
-                             | (!empty2 &(cur_addr2[1:0] == 2'b10))
-                             )
-                                cur_re3 <= 0;
-                            else
-                                begin
-                                    b_in_addr2 <= cur_addr3[10:2];
-                                    b_wd2 <= cur_data3;
-                                    b_we2 <= 1;
-                                    cur_re3 <= 1;
-                                end
-                        2'b11:
-                            if((!empty0 & (cur_addr0[1:0] == 2'b11))
-                             | (!empty1 &(cur_addr1[1:0] == 2'b11))
-                             | (!empty2 &(cur_addr2[1:0] == 2'b11))
-                             )
-                                cur_re3 <= 0;
-                            else
-                                begin
-                                    b_in_addr3 <= cur_addr3[10:2];
-                                    b_wd3 <= cur_data3;
-                                    b_we3 <= 1;
-                                    cur_re3 <= 1;
-                                end
-                    endcase
-                end
         end
 
 

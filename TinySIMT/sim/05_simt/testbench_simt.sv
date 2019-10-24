@@ -75,6 +75,8 @@ module testbench_sram_fp();
         clk = 0; #10; clk = 1; #10;
         clk = 0; #10; clk = 1; #10;
         clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        // $display("re: %h, %h, %h, %h", rd0, rd1, rd2, rd3);
         assert(rd0 === 456) else $error("rd0 wrong, %d", rd0);
         assert(rd1 === 5555) else $error("rd1 wrong, %d", rd1);
         assert(rd2 === 789) else $error("rd2 wrong, %d", rd2);
@@ -164,7 +166,14 @@ module testbench_sram_fp_bank_conflict();
 endmodule
 
 
-module simt_with_sram #(parameter FILENAME="simt_simple_test.mem")(input logic clk, reset, output logic halt);
+module simt_with_sram_dmaout #(parameter FILENAME="simt_simple_test.mem")
+(input logic clk, reset,
+    // DMA
+    input logic dmaStall,
+    output logic [1:0] dmaCmd, //00: nothing  01: d2s   10:s2d 
+    output logic [31:0] dmaSrcAddress, dmaDstAddress,
+    output logic [9:0] dmaWidth,
+    output logic halt);
         // sram core 0
         logic [31:0] sramReadData0;
         logic [31:0] sramDataAddress0, sramWriteData0;
@@ -181,10 +190,6 @@ module simt_with_sram #(parameter FILENAME="simt_simple_test.mem")(input logic c
         logic [31:0] sramReadData3;
         logic [31:0] sramDataAddress3, sramWriteData3;
         logic sramWriteEnable3;
-        // DMA
-        logic [1:0] dmaCmd; //00: nothing  01: d2s   10:s2d 
-        logic [31:0] dmaSrcAddress, dmaDstAddress;
-        logic [9:0] dmaWidth;
 
         sram_fp DataMem(clk, reset,
                 sramDataAddress0[15:2], sramWriteEnable0, sramWriteData0, sramReadData0,
@@ -192,7 +197,7 @@ module simt_with_sram #(parameter FILENAME="simt_simple_test.mem")(input logic c
                 sramDataAddress2[15:2], sramWriteEnable2, sramWriteData2, sramReadData2,
                 sramDataAddress3[15:2], sramWriteEnable3, sramWriteData3, sramReadData3);
 
-        simt_group #(FILENAME) u_cpus(clk, reset, 1'b0,
+        simt_group #(FILENAME) u_cpus(clk, reset, dmaStall,
             sramReadData0,
             sramDataAddress0, sramWriteData0,
             sramWriteEnable0,
@@ -215,6 +220,19 @@ module simt_with_sram #(parameter FILENAME="simt_simple_test.mem")(input logic c
             halt);
 
 
+endmodule
+
+module simt_with_sram #(parameter FILENAME="simt_simple_test.mem")(input logic clk, reset, output logic halt);
+        // DMA
+        logic [1:0] dmaCmd; //00: nothing  01: d2s   10:s2d 
+        logic [31:0] dmaSrcAddress, dmaDstAddress;
+        logic [9:0] dmaWidth;
+
+        simt_with_sram_dmaout #(FILENAME) u_simt_with_sram_dmaout(
+             clk, reset,
+              1'b0, dmaCmd,  dmaSrcAddress, dmaDstAddress, dmaWidth,
+                halt
+        );
 
 endmodule
 
@@ -231,10 +249,10 @@ module testbench_simt_simple();
                 clk = 0; #10; clk = 1; #10;
             end
 
-        assert(dut.DataMem.BANK0[0] === 3) else $error("wrong first data: %h", dut.DataMem.BANK0[0]);
-        assert(dut.DataMem.BANK1[0] === 7) else $error("wrong sec data: %h", dut.DataMem.BANK1[0]);
-        assert(dut.DataMem.BANK2[0] === 11) else $error("wrong third data: %h", dut.DataMem.BANK2[0]);
-        assert(dut.DataMem.BANK3[0] === 15) else $error("wrong fourth data: %h", dut.DataMem.BANK3[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK0[0] === 3) else $error("wrong first data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK0[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK1[0] === 7) else $error("wrong sec data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK1[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK2[0] === 11) else $error("wrong third data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK2[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK3[0] === 15) else $error("wrong fourth data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK3[0]);
     end
 endmodule
 
@@ -252,10 +270,10 @@ module testbench_simt_beq_forward();
                 clk = 0; #10; clk = 1; #10;
             end
 
-        assert(dut.DataMem.BANK0[0] === 7) else $error("wrong first data: %h", dut.DataMem.BANK0[0]);
-        assert(dut.DataMem.BANK1[0] === 2) else $error("wrong sec data: %h", dut.DataMem.BANK1[0]);
-        assert(dut.DataMem.BANK2[0] === 7) else $error("wrong third data: %h", dut.DataMem.BANK2[0]);
-        assert(dut.DataMem.BANK3[0] === 7) else $error("wrong fourth data: %h", dut.DataMem.BANK3[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK0[0] === 7) else $error("wrong first data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK0[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK1[0] === 2) else $error("wrong sec data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK1[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK2[0] === 7) else $error("wrong third data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK2[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK3[0] === 7) else $error("wrong fourth data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK3[0]);
     end
 endmodule
 
@@ -272,10 +290,10 @@ module testbench_simt_beq_complex();
                 clk = 0; #10; clk = 1; #10;
             end
 
-        assert(dut.DataMem.BANK0[0] === 16) else $error("wrong first data: %h", dut.DataMem.BANK0[0]);
-        assert(dut.DataMem.BANK1[0] === 5) else $error("wrong sec data: %h", dut.DataMem.BANK1[0]);
-        assert(dut.DataMem.BANK2[0] === 16) else $error("wrong third data: %h", dut.DataMem.BANK2[0]);
-        assert(dut.DataMem.BANK3[0] === 13) else $error("wrong fourth data: %h", dut.DataMem.BANK3[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK0[0] === 16) else $error("wrong first data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK0[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK1[0] === 5) else $error("wrong sec data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK1[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK2[0] === 16) else $error("wrong third data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK2[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK3[0] === 13) else $error("wrong fourth data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK3[0]);
     end
 endmodule
 
@@ -293,10 +311,10 @@ module testbench_simt_beq_backward();
                 clk = 0; #10; clk = 1; #10;
             end
 
-        assert(dut.DataMem.BANK0[0] === 1) else $error("wrong first data: %h", dut.DataMem.BANK0[0]);
-        assert(dut.DataMem.BANK1[0] === 1) else $error("wrong sec data: %h", dut.DataMem.BANK1[0]);
-        assert(dut.DataMem.BANK2[0] === 55) else $error("wrong third data: %h", dut.DataMem.BANK2[0]);
-        assert(dut.DataMem.BANK3[0] === 1) else $error("wrong fourth data: %h", dut.DataMem.BANK3[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK0[0] === 1) else $error("wrong first data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK0[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK1[0] === 1) else $error("wrong sec data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK1[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK2[0] === 55) else $error("wrong third data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK2[0]);
+        assert(dut.u_simt_with_sram_dmaout.DataMem.BANK3[0] === 1) else $error("wrong fourth data: %h", dut.u_simt_with_sram_dmaout.DataMem.BANK3[0]);
     end
 endmodule
 
@@ -316,7 +334,7 @@ module testbench_luiori(
             begin
                 clk = 0; #10; clk = 1; #10; 
             end
-        assert(dut.u_cpus.core1.DecodeStage.RegFile.regs[1] === 32'h04d2162e) else $error("fail lui ori, %h", dut.u_cpus.core1.DecodeStage.RegFile.regs[1]);
+        assert(dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[1] === 32'h04d2162e) else $error("fail lui ori, %h", dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[1]);
         $display("mips lui ori test done");
     end
     
@@ -338,7 +356,7 @@ module testbench_ori_unsigned(
             begin
                 clk = 0; #10; clk = 1; #10; 
             end
-        assert(dut.u_cpus.core1.DecodeStage.RegFile.regs[1] === 32'h0000ffff) else $error("fail ori unsigned, %h", dut.u_cpus.core1.DecodeStage.RegFile.regs[1]);
+        assert(dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[1] === 32'h0000ffff) else $error("fail ori unsigned, %h", dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[1]);
         $display("ori unsigned test done");
     end
     
@@ -358,6 +376,165 @@ module testbench_simt_srl_andi();
                 clk = 0; #10; clk = 1; #10;
             end
 
-        assert(dut.u_cpus.core1.DecodeStage.RegFile.regs[2] === 32'h3f) else $error("wrong reg[2], %h", dut.u_cpus.core1.DecodeStage.RegFile.regs[2]);
+        assert(dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[2] === 32'h3f) else $error("wrong reg[2], %h", dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[2]);
+    end
+endmodule
+
+
+module testbench_simt_swlw();
+    logic clk, reset, halt, dmaStall;
+    logic [1:0] dmaCmd;
+    logic [31:0] dmaSrcAddress, dmaDstAddress;
+    logic [9:0] dmaWidth;
+    logic [31:0] vectorpos;
+    logic [31:0] histvectors[32];
+
+    simt_with_sram_dmaout #("simt_swlw.mem") dut(clk, reset, dmaStall, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
+
+    initial begin
+        dmaStall = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+        repeat(13)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+
+        assert(dut.u_cpus.core0.DecodeStage.RegFile.regs[2] === 1) else $error("wrong reg2. %h", dut.u_cpus.core0.DecodeStage.RegFile.regs[2]);
+
+        // 0x514 byte = 0x145 word.
+        // bank = 1. 
+        $display("[0x514]=%h", dut.DataMem.BANK1[32'h51]);
+        $display("test swlw end");
+        
+    end
+endmodule
+
+module testbench_simt_slt();
+    logic clk, reset, halt, dmaStall;
+    logic [1:0] dmaCmd;
+    logic [31:0] dmaSrcAddress, dmaDstAddress;
+    logic [9:0] dmaWidth;
+    logic [31:0] vectorpos;
+    logic [31:0] histvectors[32];
+
+    simt_with_sram_dmaout #("slt_test.mem") dut(clk, reset, dmaStall, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
+
+    initial begin
+        dmaStall = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+        repeat(12)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+
+        $display("reg[3]=%h", dut.u_cpus.core0.DecodeStage.RegFile.regs[3]);
+        assert(dut.u_cpus.core0.DecodeStage.RegFile.regs[3] === 0) else $error("wrong reg2. %h", dut.u_cpus.core0.DecodeStage.RegFile.regs[2]);
+
+        $display("test slt end");
+        
+    end
+endmodule
+
+
+module testbench_simt_histo32();
+    logic clk, reset, halt, dmaStall;
+    logic [1:0] dmaCmd;
+    logic [31:0] dmaSrcAddress, dmaDstAddress;
+    logic [9:0] dmaWidth;
+    logic [31:0] vectorpos;
+    logic [31:0] histvectors[32];
+
+    simt_with_sram_dmaout #("simt_histo32.mem") dut(clk, reset, dmaStall, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
+
+    initial begin
+        $readmemh("hist_target.mem", histvectors);
+        dmaStall = 0;
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+        // $display("dmaCmd=%b", dmaCmd);
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        // here dmaCmd is 1.
+        // $display("dmaCmd=%b", dmaCmd);
+        dmaStall = 1;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10;
+        vectorpos = 0;
+        repeat(8)
+            begin
+               dut.DataMem.BANK0[vectorpos] = histvectors[vectorpos*4];
+               dut.DataMem.BANK1[vectorpos] = histvectors[vectorpos*4+1];
+               dut.DataMem.BANK2[vectorpos] = histvectors[vectorpos*4+2];
+               dut.DataMem.BANK3[vectorpos] = histvectors[vectorpos*4+3];
+               clk = 1; #10;
+               vectorpos = vectorpos+1;
+               clk = 0; #10;
+            end
+        clk = 1; #10;
+        dmaStall = 0;
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        while(dmaCmd === 2'b0)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        // just ignore last s2d and check SRAM directly.
+        dmaStall = 1;
+        clk = 0; #10; clk = 1; #10;
+        dmaStall = 0;
+        repeat(!halt)
+            begin
+                clk = 0; #10; clk = 1; #10;
+            end
+
+        // 0x514 byte = 0x145 word.
+        // bank = 1. 
+        $display("[0x514]=%h", dut.DataMem.BANK1[32'h51]);
+
+        // result is placed from 0x1080.
+        // 0x1080/4 = 0x0420 word.
+        // bank base is 0x420/4 = 0x108
+
+        // show 0x2e8 (it must be written first time, 0x9A).
+        // 0x2e8 byte = 0xba word = bank2: 0x2e
+        $display("[0x2e8] = %h", dut.DataMem.BANK2[32'h2e]);
+
+        // show 000006d0, 01b4 (it must be written in core1, first time. 0x94)
+        // 0x6d0 byte = 0x1b4 word = bank0: 6d
+        $display("[0x6d0] = %h", dut.DataMem.BANK0[32'h6d]);
+
+        // show result of 100 for all core.
+        // core0: 0x80+100*4 = 0x210 = 0x84 word = bank0 0x21
+        // core1: 0x480+100*4 = 0x610 = 0x184 word = bank0 0x61
+        // core2: 0x880+100*4 = 0xA10 = 0x284 word = bank0 0xa1
+        // core3: 0xC80+100*4 = 0xE10 = 0x384 word = bank0 0xe1
+        $display("res100: core0=%h, core1=%h, core2=%h, core3=%h",
+            dut.DataMem.BANK0[32'h21],        
+            dut.DataMem.BANK0[32'h61],        
+            dut.DataMem.BANK0[32'ha1],        
+            dut.DataMem.BANK0[32'he1],        
+         );
+
+
+        // check 4 bank result.
+        // bank0: 100: 2
+        // bank1: 101: 3
+        // bank2: 102: 4
+        // bank3: 103: 2
+
+        assert(dut.DataMem.BANK0[32'h108+25] === 2) else $error("wrong first data: %h", dut.DataMem.BANK0[32'h108+25]);
+        assert(dut.DataMem.BANK1[32'h108+25] === 3) else $error("wrong sec data: %h", dut.DataMem.BANK1[32'h108+25]);
+        assert(dut.DataMem.BANK2[32'h108+25] === 4) else $error("wrong third data: %h", dut.DataMem.BANK2[32'h108+25]);
+        assert(dut.DataMem.BANK3[32'h108+25] === 2) else $error("wrong fourth data: %h", dut.DataMem.BANK3[32'h108+25]);
+
+        $display("simt histo32 test done.");
     end
 endmodule

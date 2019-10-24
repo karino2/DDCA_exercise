@@ -1499,7 +1499,7 @@ endmodule
 
 
 
-module arty_top_simt #(parameter FILENAME="simt_beq_backward.mem")  (  
+module arty_top_simt #(parameter FILENAME="simt_histo32.mem")  (  
   inout [15:0]  ddr3_dq,
   inout [1:0]   ddr3_dqs_n,
   inout [1:0]   ddr3_dqs_p,

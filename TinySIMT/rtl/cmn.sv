@@ -38,12 +38,21 @@ always_ff @(posedge clk, negedge rstn)
      r_rp <= r_rp + 1;
 
 always_ff @(posedge clk, negedge rstn)
-  if (!rstn)
+  if (!rstn) begin
+     // $display("reset r_wc");
      r_wc <= 0;
+  end
   else if (we || re) begin
      case ({we, re})
-       2'b01: r_wc <= r_wc - 1;
-       2'b10: r_wc <= r_wc + 1;
+       2'b01: begin 
+        r_wc <= r_wc - 1;
+        // $display("r_wc decre, %h, emp=%b", r_wc, empty);
+       end 
+       2'b10:
+       begin
+        r_wc <= r_wc + 1;
+        // $display("r_wc incre, %h", r_wc);
+       end
      endcase
   end
 

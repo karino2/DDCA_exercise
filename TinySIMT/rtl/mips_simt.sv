@@ -468,19 +468,28 @@ module simt_core #(parameter TID=0) (
 
     assign halting = HaltD|HaltE|HaltM|HaltW | halt;
 
+/*
+                       aluResW, memReadDataW, regWriteAddrW,
+                        {RegWriteEnableW, MemtoRegW, HaltW});
+ */
+    always @(posedge clk)
+        begin
+            if(MemtoRegW)
+                $display("(%01d), rdataW=%h", TID, memReadDataW);
+            if(MemtoRegM)
+                $display("(%01d), raddrM=%h, %h", TID, aluResM, aluResM[15:2]);
+        end
     /*
     always @(posedge clk)
         begin
-            $display("");
+            $display("(%01d)", TID);
             $display("instrD=%h, immExtendD=%h, immExtendE=%h, dstall=%b, flush=%b", instrD, immExtendD, immExtendE, dmaStall, FlushE);
             $display("regData1D=%h, regData2D=%h, regData1E=%h, regData2E=%h,", 
                         regData1D, regData2D, regData1E, regData2E);
             $display("aluRes: E=%h, M=%h, W=%h", aluResE, aluResM, aluResW);
-            $display("Mem: we=%b, daddr=%h, wdata=%h, rdata=%h", MemWriteEnableM, aluResM, memWriteDataM, sramReadData);
+            $display("Mem: we=%b, daddr=%h, wdata=%h, rdata=%h, dmaCmd=%b", MemWriteEnableM, aluResM, memWriteDataM, sramReadData, DmaCmdM);
             $display("");
         end
-        */
-        /*
     always @(posedge clk)
         begin
             $display("");
@@ -689,19 +698,22 @@ module simt_group #(parameter FILENAME="romdata.mem")
             begin
                 dmaSrcAddress = dmaSrcAddress1;
                 dmaDstAddress = dmaDstAddress1;
-                dmaWidth = dmaWidth1;                
+                dmaWidth = dmaWidth1;
+                dmaCmd = dmaCmd1;
             end
         else if(dmaCmd2 != 2'b0)
             begin
                 dmaSrcAddress = dmaSrcAddress2;
                 dmaDstAddress = dmaDstAddress2;
                 dmaWidth = dmaWidth2;                
+                dmaCmd = dmaCmd2;
             end
         else if(dmaCmd3 != 2'b0)
             begin
                 dmaSrcAddress = dmaSrcAddress3;
                 dmaDstAddress = dmaDstAddress3;
                 dmaWidth = dmaWidth3;
+                dmaCmd = dmaCmd3;
             end
         else
             begin
@@ -709,6 +721,7 @@ module simt_group #(parameter FILENAME="romdata.mem")
                 dmaSrcAddress = dmaSrcAddress0;
                 dmaDstAddress = dmaDstAddress0;
                 dmaWidth = dmaWidth0;
+                dmaCmd = dmaCmd0;
             end
 
     // always halt simultaneously if code is correct, but use | for safety.
