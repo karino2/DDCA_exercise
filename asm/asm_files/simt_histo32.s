@@ -2,7 +2,7 @@
 // Assume data is from 0x00000.
 // place result from 64*4 = 256 byte
 
-beq $0, $31, xxx
+beq $0, $31, 1
 j after_copy
 d2s $0, $0, 32
 
@@ -94,7 +94,7 @@ muli $5, $31, 4
 
 aggr_one_word:
 addi $1, $0, 0
-addi $3, 0, 32
+addi $3, $0, 32
 add $3, $3, $5 // $3 = 0x0020+cur
 
 

@@ -276,6 +276,9 @@ namespace MipsAsm
                     }catch(System.IndexOutOfRangeException exi) {
                         System.Console.WriteLine($"Index out of range exception: line: {line}, ex: {exi.Message}");
                         return;
+                    }catch(FormatException exf) {
+                        System.Console.WriteLine($"Format exception: line: {line}, ex: {exf.Message}");
+                        return;
                     }
                 }
             }catch(IOException ex) {
