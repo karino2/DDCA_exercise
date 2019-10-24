@@ -54,10 +54,11 @@ endmodule
 
 /*
 we design ROM as 64K byte, 16K word. address needs 14bit.
+We design ROM as 4K byte, 1K word. address needs 10bit.
 */
-module romcode #(parameter FILENAME="romdata.mem")(input logic [13:0] addr,
+module romcode #(parameter FILENAME="romdata.mem")(input logic [9:0] addr,
             output logic [31:0] instr);
-    logic [31:0] ROM [16*1024-1:0];
+    logic [31:0] ROM [1024-1:0];
     
     initial begin
         $readmemh(FILENAME, ROM);
