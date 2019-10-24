@@ -20,9 +20,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module minPC(input logic [31:0] pc0, pc1, pc2, pc3,
-            output logic [31:0] pc);
-    logic [31:0] inter0, inter1;
+module minPC(input logic [13:0] pc0, pc1, pc2, pc3,
+            output logic [13:0] pc);
+    logic [13:0] inter0, inter1;
     assign inter0 = (pc0<pc1) ? pc0 : pc1;
     assign inter1 = (pc2<pc3) ? pc2: pc3;
     assign pc = (inter0 < inter1) ? inter0: inter1;
@@ -112,36 +112,41 @@ module romcode #(parameter FILENAME="romdata.mem")(input logic [13:0] addr,
 
 // To keep prefix F.
 module fetch_address_stage
-        (input logic clk, reset, Stall, Halt,
+        (input logic clk, reset, Stall, 
             input logic [1:0] pcSrc,
-            input logic [31:0] inPC, inInstr, pcBranch, pcJump,
-            output logic execOtherCore,
-            output logic [31:0] pcPlus4, instr, curPC);
-    logic [31:0] pc, pcCand, pcBranchCur, pcJumpCur;
+            input logic [13:0] inPC, pcBranch, pcJump,
+            output logic [13:0] pcPlus4, curPC);
+    logic [13:0] pc, pcCand, pcBranchCur, pcJumpCur,
+               prevInPC, prevPC, prevPCPlus4;
     logic [1:0] pcSrcCur;
 
     // romcode #(FILENAME) InstRom(pc[15:2], instrRead);
 
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
-            pcCand <=  32'h0000_0000; // PC reset address.
             pcSrcCur <= 2'b0;
-            pcBranchCur <= 32'h0000_0000;
-            pcJumpCur <= 32'h0000_0000;
+            pcBranchCur <= 14'b0;
+            pcJumpCur <= 14'b0;
+            prevInPC <= 14'b0;
+            prevPC <= 14'b0;
+            prevPCPlus4 <= 14'b0;           
         end
         else if(!Stall) begin
-            pcCand <= (inPC < pc) ? pc : pcPlus4;
+            prevInPC <= inPC;
+            prevPC <= pc;
+            prevPCPlus4 <= pcPlus4;
             pcSrcCur <= pcSrc;
             pcBranchCur <= pcBranch;
             pcJumpCur <= pcJump;
         end
 
+    // inPC is really timing siviar. So assign pcCand the begining of next timing.
+    assign pcCand = (prevInPC < prevPC) ? prevPC : prevPCPlus4;
     assign curPC = pc;
 
     assign pc = (pcSrcCur == 2'b01) ? pcBranchCur : ((pcSrcCur == 2'b10) ? pcJumpCur : pcCand);
-    assign pcPlus4 = pc+4;
-    assign execOtherCore = (inPC != pc);
-    assign instr = (Halt | execOtherCore) ? 32'b0 : inInstr;
+    // assign pcPlus4 = pc+4;
+    assign pcPlus4 = pc+1; // cut last 00 bit for faster comparison.
 
     /*
     always @(posedge clk)
@@ -157,20 +162,30 @@ endmodule
 
 module fetch2decode(input logic clk, reset, stall, 
              input logic [1:0] pcSrcD,
-             input logic [31:0] instrF, pcF,
+             input logic [31:0] instrF, 
+             input logic [13:0] pcF, inPC, curPC_F,
+             input logic haltingF, 
              output logic [1:0] pcSrcDNext,
-             output logic [31:0] instrD, pcD);
+             output logic [31:0] instrD,
+             output logic [13:0] pcD, inPC_D, curPC_D,
+             output logic haltingD);
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
-                pcD <= 32'h0000_0000; // PC reset address.
+                pcD <= 14'b0; // PC reset address.
+                inPC_D <= 14'b0;
+                curPC_D <= 14'b0;;
                 instrD <= 0;
                 pcSrcDNext <= 0;
+                haltingD <= 0;
             end
         else if(!stall)
             begin
                 instrD <= instrF;
                 pcD <= pcF;
                 pcSrcDNext <= pcSrcD;
+                inPC_D <= inPC;
+                curPC_D <= curPC_F;
+                haltingD <= haltingF;
             end 
 endmodule
 
@@ -178,13 +193,15 @@ module decode_stage #(parameter TID=0)(input logic clk, reset, regWriteEnable,
                     RegDst, BranchD, IsZeroImm,
             input logic [31:0] instr,
             input logic [4:0] regWriteAddr,
-            input logic [31:0] regWriteData, pcPlus4, aluResM,
+            input logic [31:0] regWriteData, 
+            input logic [13:0] pcPlus4,
+            input logic [31:0] aluResM,
             input logic ForwardAD, ForwardBD,
             output logic [31:0] regReadData1, regReadData2, immExtend,
             output logic [4:0] shamt,
             output logic [4:0] outRegWriteAddr,
             output logic isBranch,
-            output logic [31:0] pcBranch, pcJump);
+            output logic [13:0] pcBranch, pcJump);
 
     logic [31:0] eqLeft, eqRight;
 
@@ -196,8 +213,12 @@ module decode_stage #(parameter TID=0)(input logic clk, reset, regWriteEnable,
     assign eqRight = ForwardBD ? aluResM : regReadData2;
     
     assign isBranch = BranchD & (eqLeft == eqRight);
+    /*
     assign pcBranch = {immExtend[29:0], 2'b00}+pcPlus4;
     assign pcJump = {pcPlus4[31:28], instr[25:0], 2'b00};
+    */
+    assign pcBranch = {immExtend[13:0]}+pcPlus4;
+    assign pcJump = {instr[13:0]};
     assign shamt = instr[10:6];
 endmodule
 
@@ -244,7 +265,7 @@ module exec_stage(input logic clk, reset, ALUSrc,
                 input logic [31:0] regData1, regData2, immExtend,
                 input logic [4:0] shamt,
                 output logic zero,
-                output logic [31:0] aluRes, memWriteData);
+                output logic [31:0] aluRes, shiftRes, mulRes, memWriteData);
     logic [31:0] srcB, aluRes1;
     
     assign memWriteData = regData2;
@@ -260,7 +281,9 @@ module exec_stage(input logic clk, reset, ALUSrc,
     mux2 MuxSrcB(regData2, immExtend, ALUSrc, srcB); 
     
     logic cout;
-    alu2 Alu(regData1, srcB, ALUCtrl, cout, zero, aluRes1);
+    alu Alu(regData1, srcB, ALUCtrl[2:0], cout, zero, aluRes);
+
+    assign mulRes = regData1*immExtend[16:0];
 
     /*
     //  ShiftCtrl:
@@ -269,26 +292,29 @@ module exec_stage(input logic clk, reset, ALUSrc,
     */
     always_comb
         case(ShiftCtrl)
-            2'b01: aluRes = regData2 << shamt;
-            2'b10: aluRes = regData2 >> shamt;
-            default aluRes = aluRes1;
+            2'b01: shiftRes = regData2 << shamt;
+            2'b10: shiftRes = regData2 >> shamt;
+            default shiftRes = 32'b0;
         endcase
 endmodule
 
+// isShift, isMul
 module exec2mem(input logic clk, reset, stall, zeroE,
-            input logic [31:0] aluResE, memWriteDataE, immExtendE,
+            input logic [31:0] aluResE, shiftResE, mulResE, memWriteDataE, immExtendE,
                 regData1E, regData2E,
             input logic [4:0] regWriteAddrE, 
-            input logic [6:0]  ctrlE,
+            input logic [8:0]  ctrlE,
             output logic zeroM,
-            output logic [31:0] aluResM, memWriteDataM, immExtendM,
+            output logic [31:0] aluResM, shiftResM, mulResM, memWriteDataM, immExtendM,
                 regData1M, regData2M,
             output logic [4:0]  regWriteAddrM,
-            output logic [6:0]  ctrlM);
+            output logic [8:0]  ctrlM);
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
                 zeroM <= 0;
                 aluResM <= 0;
+                shiftResM <= 0;
+                mulResM <= 0;
                 regWriteAddrM <= 0;
                 memWriteDataM <= 0;
                 immExtendM <= 0;
@@ -300,6 +326,8 @@ module exec2mem(input logic clk, reset, stall, zeroE,
             begin
                 zeroM <= zeroE;
                 aluResM <= aluResE;
+                shiftResM <= shiftResE;
+                mulResM <= mulResE;
                 regWriteAddrM <= regWriteAddrE;
                 memWriteDataM <= memWriteDataE;
                 immExtendM <= immExtendE;
@@ -388,9 +416,10 @@ endmodule
 module simt_core #(parameter TID=0) (
     input logic clk,
     input logic reset, dmaStall,
-    input logic [31:0] inInstr, inPC,
+    input logic [31:0] inInstr,
+    input logic [13:0] inPC,
     input logic [31:0] sramReadData,
-    output logic [31:0] curPC,
+    output logic [13:0] curPC,
     output logic [31:0] sramDataAddress, sramWriteData,
     output logic sramWriteEnable,
     output logic [1:0] dmaCmd, //00: nothing  01: d2s   10:s2d 
@@ -407,7 +436,8 @@ module simt_core #(parameter TID=0) (
     logic ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE;
 
     logic [4:0] regWriteAddrD, regWriteAddrE, regWriteAddrM, regWriteAddrW;
-    logic [31:0] pcPlus4F, instrF, pcPlus4D, instrD, pcPlus4DCand, instrDCand,
+    logic [13:0] pcPlus4F, pcPlus4D, pcPlus4DCand;
+    logic [31:0] instrF,  instrD,  instrDCand,
                 regData1D, regData2D, immExtendD,                
                 regData1E, regData2E, regData1EDash, regData2EDash, immExtendE, 
                 regData1M, regData2M, immExtendM;
@@ -415,27 +445,26 @@ module simt_core #(parameter TID=0) (
 
 
     logic [31:0] memWriteDataE, memWriteDataM;
-    logic [31:0] aluResE, aluResM, aluResMCand;
-    logic zeroE;
-    logic zeroM;
+    logic [31:0] aluResE, aluResM, shiftResE, shiftResM, mulResE, mulResM, aluResMCand;
+    logic zeroE, zeroM,  isShiftM, isMulM;
     logic [31:0] memReadDataM;
     logic [31:0] aluResW, memReadDataW, regWriteDataW;
     logic [4:0] shamtD, shamtE;
     
     logic StallF, StallD, FlushE;
-    logic execOtherCoreF;
+    logic [13:0] inPC_D, curPC_D;
+    logic execOtherCoreD;
     
     logic [1:0] ForwardAE, ForwardBE;
     logic [4:0] regRsE, regRtE;
     logic [1:0] pcSrcD, pcSrcDNext;
     logic ForwardAD, ForwardBD;
-    logic [31:0] pcBranchD, pcJumpD;                     
+    logic [13:0] pcBranchD, pcJumpD;                     
 
-    logic halting, HaltD, HaltE, HaltM, HaltW;
+    logic halting, haltingD, HaltD, HaltE, HaltM, HaltW;
     logic ImmtoRegD, ImmtoRegE, ImmtoRegM;
     logic IsZeroImmD;
     logic [1:0] DmaCmdD, DmaCmdE, DmaCmdM;
-
 
     assign halting = HaltD|HaltE|HaltM|HaltW | halt;
 
@@ -487,18 +516,25 @@ module simt_core #(parameter TID=0) (
               ForwardAD, ForwardBD,
               StallF, StallD, FlushE);
 
-    fetch_address_stage FetchStage(clk, reset, StallF|dmaStall, halting, pcSrcD, inPC, inInstr, pcBranchD, pcJumpD, execOtherCoreF, pcPlus4F, instrF, curPC);
-    fetch2decode Fetch2Decode(clk, reset, StallD | dmaStall, pcSrcD, instrF, pcPlus4F, pcSrcDNext, instrDCand, pcPlus4DCand);
+
+    fetch_address_stage FetchStage(clk, reset, StallF|dmaStall, pcSrcD, inPC, pcBranchD, pcJumpD, pcPlus4F, curPC);
+
+    // fetching is really critical pass. clear instruction based on halting to the beginning of next stage.
+    fetch2decode Fetch2Decode(clk, reset, StallD | dmaStall, pcSrcD, inInstr, pcPlus4F, inPC, curPC, halting, pcSrcDNext, instrDCand, pcPlus4DCand, inPC_D, curPC_D, haltingD);
 
     /*
         F1->D1->E1
-        F2->D2->E2
+            F2->D2->E2
 
         execOtherCoreF2 means branch occures in some other thread at the end of D1.
-        branchPredict of F1 fail. clear wrong pre-fetching.
-    */
-    assign instrD = (pcSrcDNext[0] | pcSrcDNext[1] | execOtherCoreF) ? 0 : instrDCand;
-    assign pcPlus4D =  (pcSrcDNext[0] | pcSrcDNext[1] | execOtherCoreF) ? 32'h0000_0000 : pcPlus4DCand;
+        branchPredict of F2 fail and we need to clear F2.
+
+        But execOtherCoreF is siviar timing restriction.
+        So we postpone execOtherCoreF to execOtherCoreD and clear at D stage.
+     */    
+    assign execOtherCoreD = (inPC_D != curPC_D);
+    assign instrD = (pcSrcDNext[0] | pcSrcDNext[1] | execOtherCoreD | haltingD) ? 0 : instrDCand;
+    assign pcPlus4D =  (pcSrcDNext[0] | pcSrcDNext[1] | execOtherCoreD | haltingD) ? 14'b0 : pcPlus4DCand;
 
     /*
     always @(posedge clk)
@@ -514,7 +550,7 @@ module simt_core #(parameter TID=0) (
                      MemtoRegD, ImmtoRegD, ALUCtrlD,ShiftCtrlD,  JumpD, HaltD, DmaCmdD);
                      
     decode_stage #(TID) DecodeStage(clk, reset, RegWriteEnableW, RegDstD, BranchD, IsZeroImmD, instrD, regWriteAddrW, regWriteDataW,
-                          pcPlus4D, aluResM, ForwardAD, ForwardBD,
+                          pcPlus4D, aluResMCand, ForwardAD, ForwardBD,
                              regData1D , regData2D, immExtendD, shamtD, regWriteAddrD, pcSrcD[0], pcBranchD, pcJumpD);
     assign pcSrcD[1] = JumpD;
     decode2exec Decode2Exec(clk, reset, FlushE & !dmaStall, dmaStall, regData1D, regData2D, immExtendD, shamtD,
@@ -533,12 +569,16 @@ module simt_core #(parameter TID=0) (
 
     // immExtend, ImmtoReg.
     exec_stage ExecStage(clk, reset, ALUSrcE, ALUCtrlE, ShiftCtrlE, regData1EDash, regData2EDash, immExtendE, shamtE,
-                         zeroE, aluResE, memWriteDataE);
-    exec2mem Exec2Mem(clk, reset, dmaStall, zeroE, aluResE,
+                         zeroE, aluResE, shiftResE, mulResE, memWriteDataE);
+    exec2mem Exec2Mem(clk, reset, dmaStall, zeroE, aluResE, shiftResE, mulResE, 
                         memWriteDataE, immExtendE, regData1EDash, regData2EDash, regWriteAddrE, 
-                        {MemWriteEnableE,  RegWriteEnableE, MemtoRegE, HaltE, DmaCmdE, ImmtoRegE},
-                        zeroM, aluResMCand,  memWriteDataM, immExtendM, regData1M, regData2M, regWriteAddrM,
-                        {MemWriteEnableM, RegWriteEnableM, MemtoRegM, HaltM, DmaCmdM, ImmtoRegM});
+                        {(ShiftCtrlE != 2'b00), ALUCtrlE[3],  MemWriteEnableE,  RegWriteEnableE, MemtoRegE, HaltE, DmaCmdE, ImmtoRegE},
+                        zeroM, aluResMCand, shiftResM, mulResM, memWriteDataM, immExtendM, regData1M, regData2M, regWriteAddrM,
+                        {isShiftM, isMulM, MemWriteEnableM, RegWriteEnableM, MemtoRegM, HaltM, DmaCmdM, ImmtoRegM});
+
+    // execstage is tight timing, move mulResM next stage.
+    // assign mulResM =  regData1M*immExtendM;
+
 
     /*
         mem_stage MemStage(clk, reset, MemWriteEnableM,
@@ -547,9 +587,12 @@ module simt_core #(parameter TID=0) (
     */    
     assign sramWriteEnable = MemWriteEnableM;
 
-    assign aluResM = ImmtoRegM? {immExtendM[15:0], 16'b0} : aluResMCand;
 
-    assign sramDataAddress = aluResM;
+ 
+
+    assign sramDataAddress = ImmtoRegM? {immExtendM[15:0], 16'b0} :
+                    (isShiftM ? shiftResM : aluResMCand);
+    assign aluResM = isMulM? mulResM : sramDataAddress;
     assign sramWriteData = memWriteDataM;
     assign memReadDataM = sramReadData;
 
@@ -607,7 +650,8 @@ module simt_group #(parameter FILENAME="romdata.mem")
         output logic [9:0] dmaWidth,
         output logic halt);
 
-    logic [31:0] curPC, instr, instrRead;
+    logic [13:0] curPC;
+    logic [31:0] instr, instrRead;
 
 
     logic [1:0] dmaCmd0; //00: nothing  01: d2s   10:s2d 
@@ -627,12 +671,12 @@ module simt_group #(parameter FILENAME="romdata.mem")
     logic [9:0] dmaWidth3;
 
     logic halt0, halt1, halt2, halt3;
-    logic [31:0] curPC0, curPC1, curPC2, curPC3;
+    logic [13:0] curPC0, curPC1, curPC2, curPC3;
 
 
     minPC u_minPC(curPC0, curPC1, curPC2, curPC3, curPC);
 
-    romcode #(FILENAME) InstRom(curPC[15:2], instrRead);
+    romcode #(FILENAME) InstRom(curPC, instrRead);
 
     assign instr = dmaStall ? 0 : instrRead;
 
