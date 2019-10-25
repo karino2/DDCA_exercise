@@ -244,7 +244,7 @@ module testbench_simt_simple();
     initial begin
         clk = 0; reset = 1; #10;
         reset = 0; clk = 1; #10;
-        repeat(50)
+        repeat(10)
             begin
                 clk = 0; #10; clk = 1; #10;
             end
@@ -285,6 +285,7 @@ module testbench_simt_beq_complex();
     initial begin
         clk = 0; reset = 1; #10;
         reset = 0; clk = 1; #10;
+ //       repeat(20)
         repeat(50)
             begin
                 clk = 0; #10; clk = 1; #10;
@@ -451,6 +452,7 @@ module testbench_simt_histo32();
     simt_with_sram_dmaout #("simt_histo32.mem") dut(clk, reset, dmaStall, dmaCmd, dmaSrcAddress, dmaDstAddress, dmaWidth, halt);
 
     initial begin
+        $display("begin histo32 test");
         $readmemh("hist_target.mem", histvectors);
         dmaStall = 0;
         clk = 0; reset = 1; #10;
@@ -461,6 +463,11 @@ module testbench_simt_histo32();
         clk = 0; #10; clk = 1; #10;
         clk = 0; #10; clk = 1; #10;
         clk = 0; #10; clk = 1; #10;
+
+        clk = 0; #10; clk = 1; #10;
+        clk = 0; #10; clk = 1; #10;
+        // $display("dmaCmd=%b", dmaCmd);
+
         // here dmaCmd is 1.
         // $display("dmaCmd=%b", dmaCmd);
         dmaStall = 1;

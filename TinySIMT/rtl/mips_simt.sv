@@ -20,9 +20,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module minPC(input logic [9:0] pc0, pc1, pc2, pc3,
-            output logic [9:0] pc);
-    logic [9:0] inter0, inter1;
+module minPC(input logic [7:0] pc0, pc1, pc2, pc3,
+            output logic [7:0] pc);
+    logic [7:0] inter0, inter1;
     assign inter0 = (pc0<pc1) ? pc0 : pc1;
     assign inter1 = (pc2<pc3) ? pc2: pc3;
     assign pc = (inter0 < inter1) ? inter0: inter1;
@@ -106,86 +106,66 @@ module ctrlunit(input logic [5:0] Opcode, input logic [5:0] Funct,
     assign Halt = (Opcode == 6'b001110);
 endmodule
 
-// To keep prefix F.
-module fetch_address_stage
-        (input logic clk, reset, Stall, 
+module address_stage_core
+        (input logic clk, reset, Stall, isInitBubble,
             input logic [1:0] pcSrc,
-            input logic [9:0] inPC, pcBranch, pcJump,
-            output logic [9:0] pcPlus4, curPC);
-    logic [9:0] pc, pcCand, pcBranchCur, pcJumpCur,
-               prevInPC, prevPC, prevPCPlus4;
-    logic [1:0] pcSrcCur;
-
-    // romcode #(FILENAME) InstRom(pc[15:2], instrRead);
+            input logic [7:0] inPC_D, pcBranch, pcJump,
+            output logic [7:0] curPC);
 
     always_ff @(posedge clk, posedge reset)
         if(reset) begin
-            pcSrcCur <= 2'b0;
-            pcBranchCur <= 10'b0;
-            pcJumpCur <= 10'b0;
-            prevInPC <= 10'b0;
-            prevPC <= 10'b0;
-            prevPCPlus4 <= 10'b0;           
+            curPC <= 8'b0;
         end
         else if(!Stall) begin
-            prevInPC <= inPC;
-            prevPC <= pc;
-            prevPCPlus4 <= pcPlus4;
-            pcSrcCur <= pcSrc;
-            pcBranchCur <= pcBranch;
-            pcJumpCur <= pcJump;
+            case(pcSrc)
+                2'b01:
+                    curPC <= pcBranch;
+                2'b10:
+                    curPC <= pcJump;
+                default:
+                    if((inPC_D == curPC) & !isInitBubble)
+                        curPC <= curPC+1;
+            endcase
         end
 
-    // inPC is really timing siviar. So assign pcCand the begining of next timing.
-    assign pcCand = (prevInPC < prevPC) ? prevPC : prevPCPlus4;
-    assign curPC = pc;
+endmodule
 
-    /*
-    always @(posedge clk)
-        $display("prevInPC=%h, prevPC=%h, p4=%h", prevInPC, prevPC, prevPCPlus4);
-        */
-
-    assign pc = (pcSrcCur == 2'b01) ? pcBranchCur : ((pcSrcCur == 2'b10) ? pcJumpCur : pcCand);
-    // assign pcPlus4 = pc+4;
-    assign pcPlus4 = pc+1; // cut last 00 bit for faster comparison.
-
-    /*
-    always @(posedge clk)
-        $display("instr %h, pc=%h, pcSrcCurC=%b, Stall=%b", instr, pc, pcSrcCur, Stall);
-    */
-
-    // assign newPC = (pcSrc == 2'b01) ? pcBranch:  ((pcSrc == 2'b10) ? pcJump : pcPlus4);
-
+module address2fetch_core(input logic clk, reset, stall, 
+             input logic [1:0] pcSrcD,
+             input logic haltingA, 
+             output logic [1:0] pcSrcDNext,
+             output logic haltingF);
+    always_ff @(posedge clk, posedge reset)
+        if(reset) begin
+                pcSrcDNext <= 0;
+                haltingF <= 0;
+            end
+        else if(!stall)
+            begin
+                pcSrcDNext <= pcSrcD;
+                haltingF <= haltingA;
+            end 
 endmodule
 
 
 
-
-module fetch2decode(input logic clk, reset, stall, 
-             input logic [1:0] pcSrcD,
+module fetch2decode(input logic clk, reset, stall, flush,
              input logic [31:0] instrF,
-             input logic [9:0] pcF, inPC, curPC_F,
+             input logic [7:0] inPC,
              input logic haltingF, 
-             output logic [1:0] pcSrcDNext,
              output logic [31:0] instrD,
-             output logic [9:0] pcD, inPC_D, curPC_D,
+             output logic [7:0] inPC_D,
              output logic haltingD);
     always_ff @(posedge clk, posedge reset)
-        if(reset) begin
-                pcD <= 10'b0; // PC reset address.
-                inPC_D <= 10'b0;
-                curPC_D <= 10'b0;;
+        if(reset | flush) begin
+                inPC_D <= 8'b0;
                 instrD <= 0;
-                pcSrcDNext <= 0;
                 haltingD <= 0;
             end
         else if(!stall)
             begin
                 instrD <= instrF;
-                pcD <= pcF;
-                pcSrcDNext <= pcSrcD;
                 inPC_D <= inPC;
-                curPC_D <= curPC_F;
                 haltingD <= haltingF;
             end 
 endmodule
@@ -195,14 +175,14 @@ module decode_stage #(parameter TID=0)(input logic clk, reset, regWriteEnable,
             input logic [31:0] instr,
             input logic [4:0] regWriteAddr,
             input logic [31:0] regWriteData, 
-            input logic [9:0] pcPlus4,
+            input logic [7:0] pcPlus4,
             input logic [31:0] aluResM,
             input logic ForwardAD, ForwardBD,
             output logic [31:0] regReadData1, regReadData2, immExtend,
             output logic [4:0] shamt,
             output logic [4:0] outRegWriteAddr,
             output logic isBranch,
-            output logic [9:0] pcBranch, pcJump);
+            output logic [7:0] pcBranch, pcJump);
 
     logic [31:0] eqLeft, eqRight;
 
@@ -215,11 +195,11 @@ module decode_stage #(parameter TID=0)(input logic clk, reset, regWriteEnable,
     
     assign isBranch = BranchD & (eqLeft == eqRight);
     /*
-    assign pcBranch = {immExtend[29:0], 2'b00}+pcPlus4;
+    assign pcBranch = {immExtend[27:0], 2'b00}+pcPlus4;
     assign pcJump = {pcPlus4[31:28], instr[25:0], 2'b00};
     */
-    assign pcBranch = {immExtend[9:0]}+pcPlus4;
-    assign pcJump = {instr[9:0]};
+    assign pcBranch = {immExtend[7:0]}+pcPlus4;
+    assign pcJump = {instr[7:0]};
     assign shamt = instr[10:6];
 endmodule
 
@@ -388,7 +368,7 @@ module hazard(input logic [4:0] regRsD, regRtD, regRsE, regRtE,
               input logic Halt,
               output logic [1:0] ForwardAE, ForwardBE,
               output logic ForwardAD, ForwardBD,
-              output logic StallF, StallD, FlushE);
+              output logic StallA, StallF, StallD, FlushE);
     assign ForwardAE = ((regRsE != 0) & RegWriteEnableM & (regRsE == regWriteAddrM))? 2'b10 :
                         (((regRsE != 0)& RegWriteEnableW & (regRsE == regWriteAddrW))? 2'b01 : 2'b00); 
     assign ForwardBE = ((regRtE != 0) & RegWriteEnableM & (regRtE == regWriteAddrM))? 2'b10 :
@@ -401,13 +381,14 @@ module hazard(input logic [4:0] regRsD, regRtD, regRsE, regRtE,
     
     // Take care of XXXXX case.
     assign lwstall =  (MemtoRegE & ((regRsD == regWriteAddrE) | ((regRtD == regWriteAddrE ) & ALUSrcD == 0))) ? 1: 0;
-    assign branchStallALU = (BranchD & RegWriteEnableE & ((regWriteAddrE == regRsD) | (regWriteAddrE == regRtD))) ? 1: 0;
+    assign branchStallALU = (BranchD & RegWriteEnableE & (regWriteAddrE != 0) & ((regWriteAddrE == regRsD) | (regWriteAddrE == regRtD))) ? 1: 0;
     assign branchStallLw = (BranchD & 
                 ((MemtoRegE & ((regWriteAddrE == regRsD) | (regWriteAddrE == regRtD)) ) | 
                   (MemtoRegM & ((regWriteAddrM == regRsD) | (regWriteAddrM == regRtD))))) ? 1: 0;
     assign branchstall = branchStallALU | branchStallLw; 
     
     
+    assign StallA = lwstall | branchstall | Halt;
     assign StallF = lwstall | branchstall | Halt;
     assign StallD = lwstall | branchstall | Halt;
     assign FlushE = lwstall | branchstall | JumpD;
@@ -416,11 +397,12 @@ endmodule
 
 module simt_core #(parameter TID=0) (
     input logic clk,
-    input logic reset, dmaStall,
-    input logic [31:0] inInstr,
-    input logic [9:0] inPC,
+    input logic reset, dmaStall, somebodyStallA,
+    input logic [31:0] inInstrF,
+    input logic [7:0] inPC_F,
     input logic [31:0] sramReadData,
-    output logic [9:0] curPC,
+    output logic [7:0] curPC,
+    output logic StallA, 
     output logic [31:0] sramDataAddress, sramWriteData,
     output logic sramWriteEnable,
     output logic [1:0] dmaCmd, //00: nothing  01: d2s   10:s2d 
@@ -437,8 +419,7 @@ module simt_core #(parameter TID=0) (
     logic ALUSrcE, MemWriteEnableE, RegWriteEnableE, MemtoRegE;
 
     logic [4:0] regWriteAddrD, regWriteAddrE, regWriteAddrM, regWriteAddrW;
-    logic [9:0] pcPlus4F, pcPlus4D, pcPlus4DCand;
-    logic [31:0] instrD, instrDCand, regData1D, regData2D, immExtendD,                
+    logic [31:0] instrF, instrD, instrDCand, regData1D, regData2D, immExtendD,                
                 regData1E, regData2E, regData1EDash, regData2EDash, immExtendE, 
                 regData1M, regData2M, immExtendM;
                 // dash means after resolve forwarding.
@@ -452,16 +433,16 @@ module simt_core #(parameter TID=0) (
     logic [4:0] shamtD, shamtE;
     
     logic StallF, StallD, FlushE;
-    logic [9:0] inPC_D, curPC_D;
-    logic execOtherCoreD;
+    logic [7:0] inPC_D;
+    logic isInitBubble;
     
     logic [1:0] ForwardAE, ForwardBE;
     logic [4:0] regRsE, regRtE;
     logic [1:0] pcSrcD, pcSrcDNext;
     logic ForwardAD, ForwardBD;
-    logic [9:0] pcBranchD, pcJumpD;                     
+    logic [7:0] pcBranchD, pcJumpD;                     
 
-    logic halting, haltingD, HaltD, HaltE, HaltM, HaltW;
+    logic halting, haltingF, haltingD, HaltD, HaltE, HaltM, HaltW;
     logic ImmtoRegD, ImmtoRegE, ImmtoRegM;
     logic IsZeroImmD;
     logic [1:0] DmaCmdD, DmaCmdE, DmaCmdM;
@@ -479,19 +460,22 @@ module simt_core #(parameter TID=0) (
             if(MemtoRegM)
                 $display("(%01d), raddrM=%h, %h", TID, aluResM, aluResM[15:2]);
         end
-
-    /*
+        /*
     always @(posedge clk)
         begin
             $display("(%01d)", TID);
-            $display("execOtherD=%b, b=%b, pcSrcD=%b", execOtherCoreD, BranchD, pcSrcD);
-            $display("inPC_D=%h, curPC_D=%h, curPC=%h, inPC=%h", inPC_D, curPC_D, curPC, inPC);
+            $display("inInstrF=%h, inPC_F=%h, curPC=%h", inInstrF, inPC_F, curPC);
+            $display("StallA=%b, b=%b, pcSrcD=%b, pcBranchD=%h, pcJD=%h", StallA, BranchD, pcSrcD, pcBranchD, pcJumpD);
+            $display("pcSrcDNext=%b, haltingF", pcSrcDNext, haltingF);
+            $display("inPC_D=%h, curPC_D=%h, curPC=%h, inPC=%h", inPC_D, curPC_D, curPC, inPC_F);
             $display("instrD=%h, immExtendD=%h, immExtendE=%h, dstall=%b, flush=%b", instrD, immExtendD, immExtendE, dmaStall, FlushE);
             $display("ForwardAE=%b, ForwardBE=%b, StallF=%b", 
                         ForwardAE, ForwardBE, StallF);
             $display("aluRes: E=%h, M=%h, W=%h", aluResE, aluResM, aluResW);
             $display("regData1D=%h, regData2D=%h, regData1E=%h, regData2E=%h,", 
                         regData1D, regData2D, regData1E, regData2E);
+            $display("RegWriteEnable: D=%b, E=%b, M=%b, W=%b", RegWriteEnableD, RegWriteEnableE, RegWriteEnableM, RegWriteEnableW);
+            $display("RegWriteEAddr: D=%h, E=%h, M=%h, W=%h", regWriteAddrD, regWriteAddrE, regWriteAddrM, regWriteAddrW);
             $display("");
         end
             $display("regWE=%h, regDst=%h, ALUSrc=%h, Branch=%h, MemWE=%h, MemReg=%h, ALUCtrl=%h, jump=%h, dmaStall=%b", 
@@ -531,28 +515,22 @@ module simt_core #(parameter TID=0) (
               halting,
               ForwardAE, ForwardBE,
               ForwardAD, ForwardBD,
-              StallF, StallD, FlushE);
+              StallA, StallF, StallD, FlushE);
+
+    // forbidden to place nop in beggining.
+    assign isInitBubble = (curPC == 0) & (instrDCand === 0);
 
 
-    fetch_address_stage FetchStage(clk, reset, StallF|dmaStall, pcSrcD, inPC, pcBranchD, pcJumpD, pcPlus4F, curPC);
+    address_stage_core AddressStage(clk, reset, somebodyStallA|dmaStall, isInitBubble, pcSrcD, inPC_D, pcBranchD, pcJumpD, curPC);
+    address2fetch_core Address2FetchCore(clk, reset, StallD | dmaStall, pcSrcD, halting, pcSrcDNext, haltingF);
 
-    // fetching is really critical pass. clear instruction based on halting to the beginning of next stage.
-    fetch2decode Fetch2Decode(clk, reset, StallD | dmaStall, pcSrcD, inInstr, pcPlus4F, inPC, curPC, halting, pcSrcDNext, instrDCand, pcPlus4DCand, inPC_D, curPC_D, haltingD);
+    // fetch stage in core.
+    assign instrF = (pcSrcDNext[0] | pcSrcDNext[1] |haltingF) ? 32'b0 : inInstrF;
 
-    /*
-        F1->D1->E1
-            F2->D2->E2
+    fetch2decode Fetch2Decode(clk, reset, StallD | dmaStall, (!StallD & (pcSrcD[0] | pcSrcD[1])), instrF, inPC_F, haltingF, instrDCand, inPC_D, haltingD);
 
-        execOtherCoreF2 means branch occures in some other thread at the end of D1.
-        branchPredict of F2 fail and we need to clear F2.
+    assign instrD = (inPC_D != curPC) ? 32'b0 : instrDCand;
 
-        But execOtherCoreF is siviar timing restriction.
-        So we postpone execOtherCoreF to execOtherCoreD and clear at D stage.
-     */    
-    assign execOtherCoreD = (inPC_D != curPC_D);
-
-    assign instrD = (pcSrcDNext[0] | pcSrcDNext[1] | execOtherCoreD | haltingD) ? 0 : instrDCand;
-    assign pcPlus4D =  (pcSrcDNext[0] | pcSrcDNext[1] | execOtherCoreD | haltingD) ? 10'b0 : pcPlus4DCand;
 
     /*
     always @(posedge clk)
@@ -569,10 +547,10 @@ module simt_core #(parameter TID=0) (
                      MemtoRegD, ImmtoRegD, ALUCtrlD,ShiftCtrlD,  JumpD, HaltD, DmaCmdD);
                      
     decode_stage #(TID) DecodeStage(clk, reset, RegWriteEnableW, RegDstD, BranchD, IsZeroImmD, instrD, regWriteAddrW, regWriteDataW,
-                          pcPlus4D, aluResMCand, ForwardAD, ForwardBD,
+                          curPC+8'b1, aluResMCand, ForwardAD, ForwardBD,
                              regData1D , regData2D, immExtendD, shamtD, regWriteAddrD, pcSrcD[0], pcBranchD, pcJumpD);
     assign pcSrcD[1] = JumpD;
-    decode2exec Decode2Exec(clk, reset, FlushE & !dmaStall, dmaStall, regData1D, regData2D, immExtendD, shamtD,
+    decode2exec Decode2Exec(clk, reset, ((inPC_D != curPC) | FlushE) & !dmaStall, dmaStall, regData1D, regData2D, immExtendD, shamtD,
                              regWriteAddrD, instrD[25:21], instrD[20:16],
                             {ALUCtrlD, ShiftCtrlD, ALUSrcD, MemWriteEnableD, RegWriteEnableD, MemtoRegD, HaltD, ImmtoRegD, DmaCmdD},
                              regData1E, regData2E, immExtendE, shamtE,
@@ -642,7 +620,43 @@ module simt_core #(parameter TID=0) (
     writeback_stage WriteBackStage(clk, reset, MemtoRegW, aluResW, memReadDataW, regWriteDataW);
  endmodule
 
+/*
 
+    SIMT group.
+
+ */
+
+module address_stage(input logic clk, reset, stall,
+        input logic [7:0] reqPC0, reqPC1, reqPC2, reqPC3, fetchPC_F,
+        output logic [7:0] fetchPC
+);
+    logic [7:0] reqPC;
+    minPC u_minPC(reqPC0, reqPC1, reqPC2, reqPC3, reqPC);
+
+    always_ff @(posedge clk, posedge reset)
+        if(reset)
+            fetchPC <= 8'b0;
+        else if(!stall)
+            begin
+                if(fetchPC_F == reqPC)
+                    fetchPC <= fetchPC_F+1;
+                else
+                    fetchPC <= reqPC;
+            end
+
+
+
+endmodule
+
+module address2fetch(input logic clk, reset, stall, 
+        input logic [7:0] fetchPC_A,
+        output logic [7:0] fetchPC_F);
+    always_ff @(posedge clk, posedge reset)
+        if(reset)
+            fetchPC_F <= 8'b1111_1111; // start from -1.
+        else if(!stall)
+            fetchPC_F <= fetchPC_A;
+endmodule
 
 
 module simt_group #(parameter FILENAME="romdata.mem")
@@ -669,8 +683,8 @@ module simt_group #(parameter FILENAME="romdata.mem")
         output logic [9:0] dmaWidth,
         output logic halt);
 
-    logic [9:0] curPC;
-    logic [31:0] instr, instrRead;
+    logic [7:0] fetchPC_A, fetchPC_F, curPC_Req;
+    logic [31:0] instrF, instrRead;
 
 
     logic [1:0] dmaCmd0; //00: nothing  01: d2s   10:s2d 
@@ -690,21 +704,26 @@ module simt_group #(parameter FILENAME="romdata.mem")
     logic [9:0] dmaWidth3;
 
     logic halt0, halt1, halt2, halt3;
-    logic [9:0] curPC0, curPC1, curPC2, curPC3;
+    logic [7:0] curPC0, curPC1, curPC2, curPC3;
+    logic StallA, StallA0, StallA1, StallA2, StallA3;
 
 
-    minPC u_minPC(curPC0, curPC1, curPC2, curPC3, curPC);
+    address_stage AddressStage(clk, reset, StallA, curPC0, curPC1, curPC2, curPC3, fetchPC_F, fetchPC_A);
 
-    romcode #(FILENAME) InstRom(curPC, instrRead);
+    assign StallA = StallA0 | StallA1 | StallA2 | StallA3;
+    address2fetch Address2Fetch(clk, reset, StallA | dmaStall, fetchPC_A, fetchPC_F);
 
-    assign instr = dmaStall ? 0 : instrRead;
-
-
+    romcode #(FILENAME) InstRom({2'b00, fetchPC_F}, instrRead);
 
     /*
     always @(posedge clk)
-        $display("curPC=%h, instrRead %h, instrD %h. pc=%h, %h, %h, %h", curPC, instrRead, instrDCand, curPC0, curPC1, curPC2, curPC3);
+        begin
+            $display("fetchPC_A=%h, F=%h, instrRead=%h, instrF=%h, curPC=%h, %h, %h, %h", fetchPC_A, fetchPC_F, instrRead, instrF, curPC0, curPC1, curPC2, curPC3);
+        end
         */
+
+    // reset time first instruction ignore.
+    assign instrF = (dmaStall | (fetchPC_F == -1)) ? 0 : instrRead;
 
     // now only support one DMA request at a time. So only one core may issue DMA.
     always_comb
@@ -741,24 +760,24 @@ module simt_group #(parameter FILENAME="romdata.mem")
     // always halt simultaneously if code is correct, but use | for safety.
     assign halt = halt0 | halt1 | halt2 | halt3;
 
-    simt_core #(0) core0(clk, reset, dmaStall,
-     instr, curPC, sramReadData0,
-     curPC0, sramDataAddress0, sramWriteData0, sramWriteEnable0,
+    simt_core #(0) core0(clk, reset, dmaStall, StallA,
+     instrF, fetchPC_F, sramReadData0,
+     curPC0, StallA0, sramDataAddress0, sramWriteData0, sramWriteEnable0,
      dmaCmd0, dmaSrcAddress0, dmaDstAddress0, dmaWidth0, halt0);
 
-    simt_core #(1) core1(clk, reset, dmaStall,
-     instr, curPC, sramReadData1,
-     curPC1, sramDataAddress1, sramWriteData1, sramWriteEnable1,
+    simt_core #(1) core1(clk, reset, dmaStall, StallA,
+     instrF, fetchPC_F, sramReadData1,
+     curPC1, StallA1, sramDataAddress1, sramWriteData1, sramWriteEnable1,
      dmaCmd1, dmaSrcAddress1, dmaDstAddress1, dmaWidth1, halt1);
 
-    simt_core #(2) core2(clk, reset, dmaStall,
-     instr, curPC, sramReadData2,
-     curPC2, sramDataAddress2, sramWriteData2, sramWriteEnable2,
+    simt_core #(2) core2(clk, reset, dmaStall, StallA,
+     instrF, fetchPC_F, sramReadData2,
+     curPC2, StallA2, sramDataAddress2, sramWriteData2, sramWriteEnable2,
      dmaCmd2, dmaSrcAddress2, dmaDstAddress2, dmaWidth2, halt2);
 
-    simt_core #(3) core3(clk, reset, dmaStall,
-     instr, curPC,  sramReadData3,
-     curPC3, sramDataAddress3, sramWriteData3, sramWriteEnable3,
+    simt_core #(3) core3(clk, reset, dmaStall, StallA,
+     instrF, fetchPC_F,  sramReadData3,
+     curPC3, StallA3, sramDataAddress3, sramWriteData3, sramWriteEnable3,
      dmaCmd3, dmaSrcAddress3, dmaDstAddress3, dmaWidth3, halt3);
 
 endmodule
