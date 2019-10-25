@@ -377,7 +377,7 @@ module hazard(input logic [4:0] regRsD, regRtD, regRsE, regRtE,
     assign ForwardAD = ((regRsD != 0) & (regRsD == regWriteAddrM) & RegWriteEnableM)? 1: 0;
     assign ForwardBD = ((regRtD != 0) & (regRtD == regWriteAddrM) & RegWriteEnableM)? 1: 0;
                             
-    logic lwstall, branchstall, branchStallALU, branchStallLw;
+    logic lwstall, branchstall, branchStallALU, branchStallLw, writebackStall;
     
     // Take care of XXXXX case.
     assign lwstall =  (MemtoRegE & ((regRsD == regWriteAddrE) | ((regRtD == regWriteAddrE ) & ALUSrcD == 0))) ? 1: 0;
@@ -385,13 +385,14 @@ module hazard(input logic [4:0] regRsD, regRtD, regRsE, regRtE,
     assign branchStallLw = (BranchD & 
                 ((MemtoRegE & ((regWriteAddrE == regRsD) | (regWriteAddrE == regRtD)) ) | 
                   (MemtoRegM & ((regWriteAddrM == regRsD) | (regWriteAddrM == regRtD))))) ? 1: 0;
+    assign writebackStall = (RegWriteEnableW & ((regWriteAddrW == regRsD) | (regWriteAddrW == regRtD))) ? 1: 0;
     assign branchstall = branchStallALU | branchStallLw; 
     
     
-    assign StallA = lwstall | branchstall | Halt;
-    assign StallF = lwstall | branchstall | Halt;
-    assign StallD = lwstall | branchstall | Halt;
-    assign FlushE = lwstall | branchstall | JumpD;
+    assign StallA = lwstall | writebackStall | branchstall | Halt;
+    assign StallF = lwstall | writebackStall |branchstall | Halt;
+    assign StallD = lwstall | writebackStall |branchstall | Halt;
+    assign FlushE = lwstall | writebackStall |branchstall | JumpD;
 endmodule
                 
 

@@ -124,7 +124,7 @@ module regfileTID #(parameter TID=0) (
 
     logic [31:0] regs [31:0];
 
-    always_ff @(negedge clk)
+    always_ff @(posedge clk)
         if(we3) begin
             regs[a3] <= wd3;
             if(a3 != 0)

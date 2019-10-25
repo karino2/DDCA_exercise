@@ -545,3 +545,57 @@ module testbench_simt_histo32();
         $display("simt histo32 test done.");
     end
 endmodule
+
+
+
+// Test bench writen in text book 7.6.3.
+module testbench_simt_bookstest(
+    );
+    logic clk, reset, halt;
+
+    simt_with_sram #("simt_booktest.mem") dut(clk, reset, halt);
+                     
+    initial begin
+        clk = 0; reset = 1; #10;
+        reset = 0; #10;
+
+        repeat(100)
+            begin
+                clk = 1; #5; clk = 0; #5;
+            end
+    end
+        
+    always @(posedge clk)
+        begin
+            // 84 byte, 21 word, bank1: 5
+            if(dut.u_simt_with_sram_dmaout.DataMem.BANK1[5] === 7) begin
+                $display("Simulation succeeded");
+                $stop;
+            end
+        end    
+endmodule
+
+
+// test for write-read the same cygle in reg case.
+module testbench_mipstest_add(
+    );
+    logic clk, reset, halt;
+
+    simt_with_sram #("mipstest_add.mem") dut(clk, reset, halt);
+    
+    initial begin
+        clk = 0; reset = 1; #10;
+        reset = 0; clk = 1; #10;
+        clk = 0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        clk = 1; #10; clk=0; #10; clk=1; #10; clk=0; #10;
+        assert(dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[3] == 32'd8) else $error("fail reg3 add, %b", dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[3]);
+        assert(dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[4] == 32'd11) else $error("fail reg4 add, %b", dut.u_simt_with_sram_dmaout.u_cpus.core1.DecodeStage.RegFile.regs[4]);
+        $display("mips add test done");
+    end
+    
+endmodule
